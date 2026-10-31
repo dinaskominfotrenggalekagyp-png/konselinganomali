@@ -16,6 +16,19 @@ const EXTENSIONS: Record<string, string> = {
   "image/gif": "gif",
 };
 
+const BUCKET = process.env.SUPABASE_STORAGE_BUCKET ?? "uploads";
+
+/**
+ * Supabase Storage dipakai supaya upload tetap berfungsi di Vercel, karena
+ * filesystem serverless bersifat read-only & ephemeral.
+ */
+function supabaseStorage() {
+  const url = process.env.SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !key) return null;
+  return { url: url.replace(/\/+$/, ""), key, bucket: BUCKET };
+}
+
 export async function POST(request: Request) {
   const session = await getSession();
   if (!session || !isSuperadminRole(session.role)) {
@@ -42,14 +55,56 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Ukuran gambar maksimal 5 MB" }, { status: 400 });
     }
 
+    const filename = `${Date.now()}-${randomUUID().slice(0, 8)}.${extension}`;
+    const buffer = Buffer.from(await file.arrayBuffer());
+
+    // --- Supabase Storage (produksi / Vercel) ---
+    const storage = supabaseStorage();
+    if (storage) {
+      const response = await fetch(
+        `${storage.url}/storage/v1/object/${storage.bucket}/${filename}`,
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${storage.key}`,
+            "Content-Type": file.type,
+            "x-upsert": "false",
+            "cache-control": "public, max-age=31536000, immutable",
+          },
+          body: buffer,
+        }
+      );
+
+      if (!response.ok) {
+        const detail = await response.text().catch(() => "");
+        console.error("supabase storage error", response.status, detail);
+        return NextResponse.json(
+          { error: "Gagal mengunggah gambar ke storage" },
+          { status: 502 }
+        );
+      }
+
+      return NextResponse.json({
+        ok: true,
+        url: `${storage.url}/storage/v1/object/public/${storage.bucket}/${filename}`,
+      });
+    }
+
+    // --- Tanpa storage di produksi: jangan diam-diam menulis ke disk ---
+    if (process.env.NODE_ENV === "production") {
+      return NextResponse.json(
+        {
+          error:
+            "Storage belum dikonfigurasi. Set SUPABASE_URL dan SUPABASE_SERVICE_ROLE_KEY di environment.",
+        },
+        { status: 500 }
+      );
+    }
+
+    // --- Fallback lokal (development) ---
     const uploadDir = path.join(process.cwd(), "public", "uploads");
     await mkdir(uploadDir, { recursive: true });
-
-    const filename = `${Date.now()}-${randomUUID().slice(0, 8)}.${extension}`;
-    await writeFile(
-      path.join(uploadDir, filename),
-      Buffer.from(await file.arrayBuffer())
-    );
+    await writeFile(path.join(uploadDir, filename), buffer);
 
     return NextResponse.json({ ok: true, url: `/uploads/${filename}` });
   } catch (error) {

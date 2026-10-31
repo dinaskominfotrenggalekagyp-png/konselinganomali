@@ -75,11 +75,19 @@ async function main() {
     console.log(`• Akun ${newEmail} sudah ada, email admin lama dibiarkan`);
   }
 
-  // Kode booking lama WC- -> KT-
+  // Kode booking lama WC- -> KT- (portable, tanpa SQL khusus MySQL)
   try {
-    const renamed = await prisma.$executeRawUnsafe(
-      "UPDATE `Booking` SET `code` = REPLACE(`code`, 'WC-', 'KT-') WHERE `code` LIKE 'WC-%'"
-    );
+    const legacy = await prisma.booking.findMany({
+      where: { code: { startsWith: "WC-" } },
+      select: { id: true, code: true },
+    });
+    for (const booking of legacy) {
+      await prisma.booking.update({
+        where: { id: booking.id },
+        data: { code: booking.code.replace("WC-", "KT-") },
+      });
+    }
+    const renamed = legacy.length;
     if (renamed > 0) console.log(`✓ ${renamed} kode booking diperbarui: WC- -> KT-`);
   } catch (error) {
     console.log("• Kode booking lama tidak diubah:", error.message);

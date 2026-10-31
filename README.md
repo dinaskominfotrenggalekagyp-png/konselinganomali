@@ -70,7 +70,7 @@ Aplikasi fullstack untuk **Konseling Trenggalek**: situs publik yang hangat dan 
 
 - **Next.js 15** (App Router, Server Components, Server Actions) + TypeScript
 - **Tailwind CSS 3.4** dengan design token khusus
-- **Prisma 6** + **MySQL / MariaDB** (database `koseling_tgx` di XAMPP)
+- **Prisma 6** + **PostgreSQL** (Supabase, region `eu-north-1`)
 - **Auth**: `jose` (JWT) + `bcryptjs`
 - **Validasi**: `zod`
 - **Ikon**: `lucide-react`
@@ -80,17 +80,17 @@ Aplikasi fullstack untuk **Konseling Trenggalek**: situs publik yang hangat dan 
 
 ## 🚀 Menjalankan
 
-Prasyarat: **Node.js 20+**, npm, dan **MySQL/MariaDB XAMPP** yang sedang berjalan (port 3306).
+Prasyarat: **Node.js 20+**, npm, dan sebuah project **Supabase**.
 
 ```bash
 # 1. Install dependency
 npm install
 
-# 2. Buat database di MySQL (sekali saja, lewat phpMyAdmin atau CLI)
-C:\xampp\mysql\bin\mysql.exe -u root -e "CREATE DATABASE koseling_tgx CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
+# 2. Isi DATABASE_URL & DIRECT_URL di .env (lihat .env.example)
 
-# 3. Siapkan tabel + seed data demo
-npm run setup
+# 3. Terapkan migration + seed data demo
+npm run db:deploy
+npm run db:seed
 
 # 4. Jalankan development server
 npm run dev
@@ -98,7 +98,10 @@ npm run dev
 
 Buka <http://localhost:3000>.
 
-> Sudah punya data di SQLite lama (`prisma/dev.db`)? Set `DATABASE_URL` ke MySQL, jalankan `npm run db:push`, lalu `npm run db:migrate:sqlite` untuk memindahkan seluruh isi database (skrip mencocokkan jumlah baris setiap tabel).
+> Database sudah berisi data dari MySQL lama. Prosedur migrasi lengkap (struktur
+> + seluruh data) ada di [`MIGRASI-SUPABASE.md`](MIGRASI-SUPABASE.md).
+>
+> Untuk deploy ke Vercel, baca bagian **Deploy ke Vercel** di dokumen yang sama.
 
 ### Build produksi
 
@@ -113,10 +116,13 @@ npm start
 
 | Perintah | Fungsi |
 | --- | --- |
-| `npm run db:push` | Sinkronkan schema ke MySQL |
+| `npm run db:push` | Sinkronkan schema ke PostgreSQL (tanpa migration history) |
+| `npm run db:migrate` | Buat migration baru dari perubahan schema |
+| `npm run db:deploy` | Terapkan migration ke Supabase (production) |
 | `npm run db:seed` | Isi ulang data demo |
 | `npm run db:reset` | Reset total + seed |
-| `npm run db:migrate:sqlite` | Salin data dari `prisma/dev.db` (SQLite) ke MySQL |
+| `npm run db:migrate:supabase` | Salin seluruh data dari MySQL XAMPP ke Supabase |
+| `npm run db:rls` | Aktifkan RLS & cabut akses `anon` di Supabase |
 | `npm run db:rebrand` | Perbarui data lama ke brand/warna baru tanpa menghapus data |
 | `npm run setup` | generate + push + seed |
 
@@ -141,7 +147,10 @@ Jalankan `npm run db:accounts` untuk memastikan akun staf di atas tersedia tanpa
 Salin contoh berikut ke `.env` (sudah tersedia untuk development):
 
 ```env
-DATABASE_URL="mysql://root:@127.0.0.1:3306/koseling_tgx"
+# Transaction pooler (6543) — runtime & Vercel
+DATABASE_URL="postgresql://postgres.<ref>:<password>@aws-0-eu-north-1.pooler.supabase.com:6543/postgres?pgbouncer=true&connection_limit=1"
+# Session pooler (5432) — prisma migrate / db push / seed
+DIRECT_URL="postgresql://postgres.<ref>:<password>@aws-0-eu-north-1.pooler.supabase.com:5432/postgres"
 AUTH_SECRET="ganti-dengan-string-acak-panjang"
 
 NEXT_PUBLIC_APP_URL="http://localhost:3000"
@@ -213,9 +222,12 @@ Skema lengkap: [`prisma/schema.prisma`](prisma/schema.prisma).
 
 ```
 prisma/
-  schema.prisma        # Model database (provider: mysql)
+  schema.prisma        # Model database (provider: postgresql)
+  migrations/          # Migration history (commit ke git)
+  supabase-rls.sql     # Hardening RLS untuk Supabase
   seed.ts              # Data demo lengkap
-  migrate-sqlite-to-mysql.mjs  # Skrip migrasi data SQLite → MySQL
+  migrate-mysql-to-supabase.mjs  # Skrip migrasi data MySQL → Supabase
+  migrate-sqlite-to-mysql.mjs    # Skrip lama SQLite → MySQL (arsip)
   dev.db               # SQLite lama (cadangan, tidak dipakai lagi)
 src/
   app/
@@ -241,7 +253,7 @@ src/
 
 - Jangan commit `.env` produksi atau `AUTH_SECRET` asli.
 - Ganti `AUTH_SECRET` dan kredensial demo sebelum deploy.
-- Untuk produksi, gunakan user MySQL khusus (jangan `root` tanpa password) dan pertimbangkan PostgreSQL bila butuh replikasi/HA.
+- Untuk produksi, jalankan aplikasi lewat **Transaction Pooler** Supabase (port 6543) agar tidak kehabisan koneksi di Vercel, dan aktifkan RLS (`npm run db:rls`) supaya tabel tidak terekspos lewat REST API publik.
 - Aplikasi ini adalah demonstrasi produk; kepatuhan penuh terhadap UU PDP memerlukan audit, DPA dengan vendor, dan prosedur operasional tambahan.
 
 ---

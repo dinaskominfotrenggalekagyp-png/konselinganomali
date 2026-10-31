@@ -17,6 +17,9 @@ build
 *.db
 *.db-journal
 prisma/dev.db
+backup/
+.env.mysql.backup
+vercel-env.txt
 
 # misc
 .DS_Store

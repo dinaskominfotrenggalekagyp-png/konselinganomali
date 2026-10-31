@@ -44,8 +44,15 @@ export default async function AdminPengaturanPage({
 
   const dbTarget = (() => {
     const url = process.env.DATABASE_URL ?? "";
-    const match = url.match(/^mysql:\/\/[^@]*@([^/]+)\/([^?]+)/);
-    return match ? `${match[2]} @ ${match[1]}` : "MySQL (XAMPP)";
+    const match = url.match(/^postgres(?:ql)?:\/\/[^@]*@([^/]+)\/([^?]+)/);
+    if (match) {
+      const host = match[1].replace(/:.*$/, "");
+      return `${match[2]} @ ${host}`;
+    }
+    const mysqlMatch = url.match(/^mysql:\/\/[^@]*@([^/]+)\/([^?]+)/);
+    return mysqlMatch
+      ? `${mysqlMatch[2]} @ ${mysqlMatch[1]}`
+      : "PostgreSQL (Supabase)";
   })();
 
   const emailReady = Boolean(

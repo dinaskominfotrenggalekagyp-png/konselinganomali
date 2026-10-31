@@ -1,15 +1,26 @@
-// Prisma schema — Konseling Trenggalek (clone platform asesmen psikologi)
-// Database: MySQL / MariaDB (XAMPP). Jalankan `npm run setup` untuk
-// membuat tabel + seed, atau `npm run db:migrate:sqlite` untuk memindahkan
-// data dari prisma/dev.db.
+// Prisma schema — Konseling Trenggalek
+// Database: PostgreSQL (Supabase).
+//
+// DATABASE_URL : koneksi pooler Supabase (port 6543) untuk runtime / Vercel
+// DIRECT_URL   : koneksi langsung (port 5432) untuk `prisma migrate` / `db push`
+//
+// Perintah umum:
+//   npm run db:push          # sinkronkan skema tanpa migration history (dev)
+//   npm run db:migrate       # buat migration baru (dev)
+//   npm run db:deploy        # terapkan migration ke Supabase (production)
+//   npm run db:seed          # isi data awal
+//   npm run db:migrate:supabase  # pindahkan data dari MySQL lokal
 
 generator client {
-  provider = "prisma-client-js"
+  provider      = "prisma-client-js"
+  // "native" untuk lokal (Windows), "rhel-openssl-3.0.x" untuk runtime Vercel.
+  binaryTargets = ["native", "rhel-openssl-3.0.x"]
 }
 
 datasource db {
-  provider = "mysql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
 model User {
@@ -131,7 +142,7 @@ model Article {
   slug        String   @unique
   category    String
   excerpt     String   @db.Text
-  content     String   @db.LongText
+  content     String   @db.Text
   cover       String
   author      String
   readMinutes Int      @default(4)
@@ -148,7 +159,7 @@ model Assessment {
   description String  @db.Text
   type        String  @default("self")
   duration    Int     @default(5)
-  questions   String  @db.LongText // JSON: [{ id, text, options:[{label,value}] }]
+  questions   String  @db.Text // JSON: [{ id, text, options:[{label,value}] }]
   scoring     String  @db.Text // JSON: { categories:[{max,label,summary,color}], maxScore }
   isActive    Boolean @default(true)
 
@@ -161,7 +172,7 @@ model AssessmentResult {
   userId       String?
   guestName    String?
   guestEmail   String?
-  answers      String   @db.LongText // JSON
+  answers      String   @db.Text // JSON
   score        Int
   category     String
   summary      String   @db.Text
@@ -224,7 +235,7 @@ model EmailLog {
   id        String   @id @default(cuid())
   to        String
   subject   String   @db.Text
-  body      String   @db.LongText
+  body      String   @db.Text
   provider  String   @default("console")
   status    String   @default("SENT")
   error     String?  @db.Text

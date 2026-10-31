@@ -8,6 +8,7 @@ const nextConfig: NextConfig = {
       { protocol: "https", hostname: "plus.unsplash.com" },
       { protocol: "https", hostname: "framerusercontent.com" },
       { protocol: "https", hostname: "ui-avatars.com" },
+      { protocol: "https", hostname: "*.supabase.co" },
     ],
   },
   experimental: {

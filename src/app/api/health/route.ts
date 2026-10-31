@@ -15,7 +15,7 @@ export async function GET() {
       status: "ok",
       app: "warna-citta",
       time: new Date().toISOString(),
-      database: "mysql/mariadb (prisma)",
+      database: "postgresql (supabase + prisma)",
       counts: { users, bookings, articles, assessments, results },
       integrations: {
         email: process.env.RESEND_API_KEY ? "resend" : "outbox (dev)",

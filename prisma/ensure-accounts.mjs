@@ -1,10 +1,7 @@
 import { PrismaClient } from "@prisma/client";
 import bcrypt from "bcryptjs";
 
-const db = new PrismaClient({
-  datasourceUrl:
-    process.env.DATABASE_URL ?? "mysql://root:@127.0.0.1:3306/koseling_tgx",
-});
+const db = new PrismaClient();
 
 const ACCOUNTS = [
   {

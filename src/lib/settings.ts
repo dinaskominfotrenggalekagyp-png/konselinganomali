@@ -7,11 +7,21 @@ import {
 } from "@/lib/branding";
 
 export async function getSettingsMap() {
-  const rows = await db.setting.findMany();
-  return Object.fromEntries(rows.map((row) => [row.key, row.value])) as Record<
-    string,
-    string
-  >;
+  try {
+    const rows = await db.setting.findMany();
+    return Object.fromEntries(rows.map((row) => [row.key, row.value])) as Record<
+      string,
+      string
+    >;
+  } catch (error) {
+    // Jangan sampai build / halaman publik gagal total hanya karena tabel
+    // Setting belum bisa dibaca (mis. saat prerender di CI tanpa database).
+    console.error(
+      "[settings] gagal membaca tabel Setting, memakai nilai default:",
+      error instanceof Error ? error.message : error
+    );
+    return {};
+  }
 }
 
 export async function getBranding(): Promise<Branding> {
