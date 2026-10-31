@@ -10,7 +10,7 @@ import {
   ShieldCheck,
   Sparkles,
 } from "lucide-react";
-import { db } from "@/lib/db";
+import { getServices } from "@/lib/content";
 import { ContactForm } from "@/components/contact-form";
 import { Reveal } from "@/components/reveal";
 
@@ -23,7 +23,7 @@ export const metadata: Metadata = {
 export const dynamic = "force-dynamic";
 
 export default async function KontakPage() {
-  const services = await db.service.findMany({ where: { isActive: true } });
+  const services = await getServices();
 
   return (
     <>

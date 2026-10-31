@@ -59,6 +59,8 @@ model Psychologist {
 
   user     User?     @relation(fields: [userId], references: [id])
   bookings Booking[]
+
+  @@index([isActive, reviews])
 }
 
 model Service {
@@ -77,6 +79,9 @@ model Service {
   isActive    Boolean @default(true)
 
   bookings Booking[]
+
+  @@index([isActive, category])
+  @@index([isActive, name])
 }
 
 model Booking {
@@ -106,6 +111,8 @@ model Booking {
 
   @@index([date])
   @@index([status])
+  @@index([userId])
+  @@index([psychologistId, date])
 }
 
 model SessionMessage {
@@ -150,6 +157,8 @@ model Article {
   published   Boolean  @default(true)
   publishedAt DateTime @default(now())
   createdAt   DateTime @default(now())
+
+  @@index([published, publishedAt])
 }
 
 model Assessment {
@@ -164,6 +173,8 @@ model Assessment {
   isActive    Boolean @default(true)
 
   results AssessmentResult[]
+
+  @@index([isActive, title])
 }
 
 model AssessmentResult {
@@ -206,6 +217,8 @@ model ContactMessage {
   message   String   @db.Text
   status    String   @default("NEW") // NEW | READ | REPLIED
   createdAt DateTime @default(now())
+
+  @@index([status, createdAt])
 }
 
 model Newsletter {
@@ -250,6 +263,8 @@ model ActivityLog {
   createdAt DateTime @default(now())
 
   user User? @relation(fields: [userId], references: [id])
+
+  @@index([createdAt])
 }
 
 model Setting {

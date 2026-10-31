@@ -1,6 +1,6 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { revalidatePath, revalidateTag } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { db } from "@/lib/db";
@@ -204,6 +204,7 @@ export async function togglePsychologistAction(formData: FormData) {
   revalidatePath("/admin/psikolog");
   revalidatePath("/klinik");
   revalidatePath("/");
+  revalidateTag("psychologists");
 }
 
 export async function createPsychologistAction(formData: FormData) {
@@ -280,6 +281,7 @@ export async function createPsychologistAction(formData: FormData) {
   revalidatePath("/klinik");
   revalidatePath(`/klinik/psikolog/${slug}`);
   revalidatePath("/");
+  revalidateTag("psychologists");
   redirect(
     `/admin/psikolog?ok=${encodeURIComponent(
       `Psikolog dan akun login ${email} berhasil dibuat`
@@ -312,6 +314,7 @@ export async function updatePsychologistAction(formData: FormData) {
   revalidatePath("/klinik");
   revalidatePath(`/klinik/psikolog/${psychologist.slug}`);
   revalidatePath("/");
+  revalidateTag("psychologists");
   redirect(
     `/admin/psikolog?ok=${encodeURIComponent(
       `Harga ${psychologist.name} diperbarui`
@@ -452,6 +455,7 @@ export async function updatePsychologistDetailsAction(formData: FormData) {
   revalidatePath("/klinik");
   revalidatePath(`/klinik/psikolog/${psychologist.slug}`);
   revalidatePath("/");
+  revalidateTag("psychologists");
   redirect(
     `/admin/psikolog/${id}?ok=${encodeURIComponent("Data psikolog dan akun diperbarui")}`
   );
@@ -511,6 +515,7 @@ export async function deletePsychologistAction(formData: FormData) {
   revalidatePath("/klinik");
   revalidatePath(`/klinik/psikolog/${psychologist.slug}`);
   revalidatePath("/");
+  revalidateTag("psychologists");
   redirect(
     `/admin/psikolog?ok=${encodeURIComponent(
       `Psikolog ${psychologist.name} dan akunnya dihapus`
@@ -670,6 +675,7 @@ export async function saveArticleAction(formData: FormData) {
   revalidatePath("/admin/artikel");
   revalidatePath("/edukasi");
   revalidatePath("/");
+  revalidateTag("articles");
   redirect("/admin/artikel?ok=Artikel+disimpan");
 }
 
@@ -685,6 +691,7 @@ export async function deleteArticleAction(formData: FormData) {
 
   revalidatePath("/admin/artikel");
   revalidatePath("/edukasi");
+  revalidateTag("articles");
 }
 
 const assessmentOptionSchema = z.object({
@@ -762,6 +769,7 @@ export async function createAssessmentAction(formData: FormData) {
   await logActivity(admin.id, "ASSESSMENT_CREATED", `${data.title} (${slug})`);
   revalidatePath("/admin/asesmen");
   revalidatePath("/psikotes");
+  revalidateTag("assessments");
   redirect(`/admin/asesmen?ok=${encodeURIComponent("Asesmen baru berhasil dibuat")}`);
 }
 
@@ -786,6 +794,7 @@ export async function toggleAssessmentAction(formData: FormData) {
 
   revalidatePath("/admin/asesmen");
   revalidatePath("/psikotes");
+  revalidateTag("assessments");
 }
 
 const settingSchema = z.object({
@@ -809,6 +818,7 @@ export async function saveSettingAction(formData: FormData) {
 
   revalidatePath("/admin/pengaturan");
   revalidatePath("/");
+  revalidateTag("settings");
   redirect("/admin/pengaturan?ok=Pengaturan+disimpan");
 }
 
@@ -851,6 +861,7 @@ export async function saveBrandingAction(formData: FormData) {
   await logActivity(actor.id, "BRANDING_UPDATED", "Identitas, beranda & tampilan");
   revalidatePath("/");
   revalidatePath("/admin/pengaturan");
+  revalidateTag("settings");
   redirect("/admin/pengaturan?ok=Branding+dan+beranda+disimpan");
 }
 

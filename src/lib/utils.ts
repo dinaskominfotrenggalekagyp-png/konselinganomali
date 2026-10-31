@@ -13,7 +13,10 @@ export function formatIDR(value: number) {
 }
 
 export function formatDate(value: string | Date, opts?: Intl.DateTimeFormatOptions) {
-  const date = typeof value === "string" ? new Date(`${value}T00:00:00`) : value;
+  const date =
+    value instanceof Date
+      ? value
+      : new Date(/^\d{4}-\d{2}-\d{2}$/.test(value) ? `${value}T00:00:00` : value);
   if (Number.isNaN(date.getTime())) return String(value);
   return new Intl.DateTimeFormat("id-ID", {
     day: "numeric",

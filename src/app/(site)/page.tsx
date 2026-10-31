@@ -20,7 +20,7 @@ import {
   Video,
   Users,
 } from "lucide-react";
-import { db } from "@/lib/db";
+import { getFaqs, getLatestArticles, getServices, getTestimonials } from "@/lib/content";
 import { Reveal } from "@/components/reveal";
 import { AnimatedStat } from "@/components/animated-stat";
 import { FaqAccordion } from "@/components/faq-accordion";
@@ -39,23 +39,17 @@ const VALUE_IMAGE =
 export const dynamic = "force-dynamic";
 
 export default async function HomePage() {
-  const [services, testimonials, faqs, articles, branding] = await Promise.all([
-    db.service.findMany({
-      where: { isActive: true, category: { in: ["Klinik", "Edukasi", "Psikotes"] } },
-      orderBy: { name: "asc" },
-    }),
-    db.testimonial.findMany({
-      where: { isPublished: true },
-      orderBy: { id: "asc" },
-    }),
-    db.faq.findMany({ orderBy: { sort: "asc" } }),
-    db.article.findMany({
-      where: { published: true },
-      orderBy: { publishedAt: "desc" },
-      take: 3,
-    }),
+  const [allServices, testimonials, faqs, articles, branding] = await Promise.all([
+    getServices(),
+    getTestimonials(),
+    getFaqs(),
+    getLatestArticles(3),
     getBranding(),
   ]);
+
+  const services = allServices.filter((service) =>
+    ["Klinik", "Edukasi", "Psikotes"].includes(service.category)
+  );
 
   const featured = services.find((s) => s.isFeatured) ?? services[0];
   const featuredHighlights: string[] = featured

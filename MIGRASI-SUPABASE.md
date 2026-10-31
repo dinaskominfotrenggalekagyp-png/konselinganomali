@@ -197,10 +197,14 @@ tersedia, dan hanya menulis ke `public/uploads` saat development lokal.
 1. **Upload file** — sudah ditangani: `src/app/api/admin/upload/route.ts` memakai
    Supabase Storage (`uploads` bucket). Tanpa `SUPABASE_SERVICE_ROLE_KEY`, upload
    akan error 500 di produksi (fallback disk hanya aktif saat development).
-2. **Connection limit** — serverless membuka banyak koneksi. Selalu pakai
-   Transaction Pooler (6543) + `connection_limit=1` untuk `DATABASE_URL`.
-3. **Prepared statements** — `pgbouncer=true` mematikan prepared statement cache
-   Prisma. Ini sudah ditangani lewat parameter tersebut.
+2. **Pooler** — `DATABASE_URL` boleh tetap memakai Transaction Pooler (6543),
+   tetapi `src/lib/db.ts` otomatis mengalihkannya ke **Session Pooler (5432)**
+   saat runtime. Alasannya: pada project ini port 6543 terukur ~1.700 ms/query,
+   sedangkan 5432 hanya ~300 ms (≈6x lebih cepat). Set
+   `PRISMA_USE_TRANSACTION_POOLER=1` bila ingin memakai 6543 apa adanya
+   (mis. saat trafik tinggi dan koneksi mulai menipis).
+3. **Prepared statements** — parameter `pgbouncer=true` hanya diperlukan untuk
+   transaction mode. `db.ts` menghapusnya saat beralih ke session mode.
 4. **Build tanpa database** — semua halaman yang membaca DB sudah
    `force-dynamic`, jadi build tidak butuh koneksi DB. Env var tetap wajib untuk
    runtime.
@@ -208,6 +212,24 @@ tersedia, dan hanya menulis ke `public/uploads` saat development lokal.
    Vercel juga Eropa (mis. `fra1`) agar latensi rendah. Bisa diubah di
    **Project Settings → Functions → Region**.
 6. **`prisma generate`** — sudah ada di build script, tidak perlu `postinstall`.
+
+### 7.1 Optimasi performa yang sudah diterapkan
+
+| Optimasi | Lokasi | Efek |
+|---|---|---|
+| Session pooler untuk runtime | `src/lib/db.ts` | ~1.700 ms → ~300 ms per query |
+| Cache data publik (TTL 5 menit + tag) | `src/lib/content.ts` | Perpindahan menu tidak lagi menunggu database |
+| Cache pengaturan situs | `src/lib/settings.ts` | Layout tidak query `Setting` tiap request |
+| Dedupe user per request | `src/lib/auth.ts` (`cache()`) | Layout + page cukup 1 query user |
+| `after()` untuk hitungan views | `edukasi/[slug]/page.tsx` | Write tidak menahan response |
+| Index filter/urutan | `prisma/migrations/*_add_query_indexes` | Filter `isActive`, `published`, dll. lebih murah |
+| Health check 1 round trip | `api/health/route.ts` | 5 query → 1 query |
+
+Invalidasi cache dilakukan otomatis lewat `revalidateTag()` di
+`src/app/admin/actions.ts` (tag: `settings`, `psychologists`, `articles`,
+`assessments`). Jadi setelah admin menyimpan perubahan, halaman publik langsung
+memakai data baru tanpa menunggu TTL.
+
 
 ---
 

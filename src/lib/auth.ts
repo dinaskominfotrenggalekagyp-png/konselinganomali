@@ -1,4 +1,5 @@
 import "server-only";
+import { cache } from "react";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { SignJWT, jwtVerify } from "jose";
@@ -76,7 +77,11 @@ export async function getSession(): Promise<SessionPayload | null> {
   }
 }
 
-export async function getCurrentUser() {
+/**
+ * Dibungkus `cache()` agar layout dan page pada request yang sama berbagi satu
+ * query (sebelumnya masing-masing memanggil database sendiri-sendiri).
+ */
+export const getCurrentUser = cache(async () => {
   const session = await getSession();
   if (!session) return null;
 
@@ -91,7 +96,7 @@ export async function getCurrentUser() {
       createdAt: true,
     },
   });
-}
+});
 
 export async function requireUser() {
   const user = await getCurrentUser();

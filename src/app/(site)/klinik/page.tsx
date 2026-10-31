@@ -13,7 +13,7 @@ import {
   Star,
   Video,
 } from "lucide-react";
-import { db } from "@/lib/db";
+import { getPsychologists, getServices } from "@/lib/content";
 import { Reveal } from "@/components/reveal";
 import { ServiceGrid } from "@/components/service-grid";
 import { ContactForm } from "@/components/contact-form";
@@ -28,11 +28,8 @@ export const dynamic = "force-dynamic";
 
 export default async function KlinikPage() {
   const [services, psychologists] = await Promise.all([
-    db.service.findMany({ where: { isActive: true }, orderBy: { name: "asc" } }),
-    db.psychologist.findMany({
-      where: { isActive: true },
-      orderBy: { reviews: "desc" },
-    }),
+    getServices(),
+    getPsychologists(),
   ]);
 
   return (

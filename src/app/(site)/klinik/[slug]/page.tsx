@@ -14,8 +14,12 @@ import {
   Star,
   Video,
 } from "lucide-react";
-import { db } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
+import {
+  getPsychologists,
+  getServiceBySlug,
+  getServices,
+} from "@/lib/content";
 import { BookingForm } from "@/components/booking-form";
 import { Reveal } from "@/components/reveal";
 import { formatIDR, safeJson } from "@/lib/utils";
@@ -28,7 +32,7 @@ export async function generateMetadata({
   params: Promise<{ slug: string }>;
 }): Promise<Metadata> {
   const { slug } = await params;
-  const service = await db.service.findUnique({ where: { slug } });
+  const service = await getServiceBySlug(slug);
   if (!service) return { title: "Layanan tidak ditemukan" };
   return {
     title: service.name,
@@ -46,17 +50,18 @@ export default async function ServiceDetailPage({
   const { slug } = await params;
   const { psikolog } = await searchParams;
 
-  const service = await db.service.findUnique({ where: { slug } });
+  const service = await getServiceBySlug(slug);
   if (!service || !service.isActive) notFound();
 
-  const [psychologists, user, related] = await Promise.all([
-    db.psychologist.findMany({ where: { isActive: true }, orderBy: { reviews: "desc" } }),
+  const [psychologists, user, allServices] = await Promise.all([
+    getPsychologists(),
     getCurrentUser(),
-    db.service.findMany({
-      where: { isActive: true, id: { not: service.id }, category: service.category },
-      take: 3,
-    }),
+    getServices(),
   ]);
+
+  const related = allServices
+    .filter((item) => item.id !== service.id && item.category === service.category)
+    .slice(0, 3);
 
   const highlights = safeJson<string[]>(service.highlights, []);
   const preselected = psychologists.find((p) => p.slug === psikolog);

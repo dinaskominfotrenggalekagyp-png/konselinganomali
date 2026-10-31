@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { after } from "next/server";
 import {
   ArrowLeft,
   ArrowRight,
@@ -12,6 +13,7 @@ import {
   Sparkles,
 } from "lucide-react";
 import { db } from "@/lib/db";
+import { getArticleBySlug, getPublishedArticles } from "@/lib/content";
 import { ArticleBody } from "@/components/article-body";
 import { ArticleCard } from "@/components/article-card";
 import { ShareButtons } from "@/components/share-buttons";
@@ -25,8 +27,12 @@ export async function generateMetadata({
   params: Promise<{ slug: string }>;
 }): Promise<Metadata> {
   const { slug } = await params;
-  const article = await db.article.findUnique({ where: { slug } });
+  const article = await getArticleBySlug(slug);
   if (!article) return { title: "Artikel tidak ditemukan" };
+  const publishedAt =
+    typeof article.publishedAt === "string"
+      ? new Date(article.publishedAt)
+      : article.publishedAt;
   return {
     title: article.title,
     description: article.excerpt,
@@ -35,7 +41,9 @@ export async function generateMetadata({
       description: article.excerpt,
       images: [article.cover],
       type: "article",
-      publishedTime: article.publishedAt.toISOString(),
+      ...(publishedAt && !Number.isNaN(publishedAt.getTime())
+        ? { publishedTime: publishedAt.toISOString() }
+        : {}),
     },
   };
 }
@@ -46,19 +54,29 @@ export default async function ArticleDetailPage({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
-  const article = await db.article.findUnique({ where: { slug } });
+  const article = await getArticleBySlug(slug);
   if (!article || !article.published) notFound();
 
-  await db.article.update({
-    where: { id: article.id },
-    data: { views: { increment: 1 } },
+  // Hitungan dibaca (views) tidak perlu menahan response. Jalankan setelah
+  // response terkirim supaya halaman tetap cepat; kalau gagal, cukup dicatat.
+  after(async () => {
+    try {
+      await db.article.update({
+        where: { id: article.id },
+        data: { views: { increment: 1 } },
+      });
+    } catch (error) {
+      console.error(
+        "[edukasi] gagal menambah views:",
+        error instanceof Error ? error.message : error
+      );
+    }
   });
 
-  const related = await db.article.findMany({
-    where: { published: true, id: { not: article.id } },
-    orderBy: { publishedAt: "desc" },
-    take: 3,
-  });
+  const allArticles = await getPublishedArticles();
+  const related = allArticles
+    .filter((item) => item.id !== article.id)
+    .slice(0, 3);
 
   const headings = article.content
     .split("\n")

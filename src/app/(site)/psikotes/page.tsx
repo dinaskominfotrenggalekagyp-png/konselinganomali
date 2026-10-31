@@ -11,7 +11,7 @@ import {
   Stethoscope,
   TrendingUp,
 } from "lucide-react";
-import { db } from "@/lib/db";
+import { getActiveAssessments } from "@/lib/content";
 import { Reveal } from "@/components/reveal";
 import { safeJson } from "@/lib/utils";
 
@@ -24,10 +24,7 @@ export const metadata: Metadata = {
 export const dynamic = "force-dynamic";
 
 export default async function PsikotesPage() {
-  const assessments = await db.assessment.findMany({
-    where: { isActive: true },
-    orderBy: { title: "asc" },
-  });
+  const assessments = await getActiveAssessments();
 
   return (
     <>

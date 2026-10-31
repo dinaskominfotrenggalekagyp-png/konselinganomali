@@ -11,7 +11,7 @@ import {
   Users,
   Video,
 } from "lucide-react";
-import { db } from "@/lib/db";
+import { getPublishedArticles } from "@/lib/content";
 import { Reveal } from "@/components/reveal";
 import { ArticleExplorer } from "@/components/article-explorer";
 import { formatDate } from "@/lib/utils";
@@ -55,10 +55,7 @@ const EVENTS = [
 ];
 
 export default async function EdukasiPage() {
-  const articles = await db.article.findMany({
-    where: { published: true },
-    orderBy: { publishedAt: "desc" },
-  });
+  const articles = await getPublishedArticles();
 
   const [featured, ...rest] = articles;
 

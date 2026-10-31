@@ -1,4 +1,6 @@
 import "server-only";
+import { cache } from "react";
+import { unstable_cache } from "next/cache";
 import { db } from "@/lib/db";
 import {
   DEFAULT_BRANDING,
@@ -6,25 +8,38 @@ import {
   type Branding,
 } from "@/lib/branding";
 
-export async function getSettingsMap() {
-  try {
-    const rows = await db.setting.findMany();
-    return Object.fromEntries(rows.map((row) => [row.key, row.value])) as Record<
-      string,
-      string
-    >;
-  } catch (error) {
-    // Jangan sampai build / halaman publik gagal total hanya karena tabel
-    // Setting belum bisa dibaca (mis. saat prerender di CI tanpa database).
-    console.error(
-      "[settings] gagal membaca tabel Setting, memakai nilai default:",
-      error instanceof Error ? error.message : error
-    );
-    return {};
-  }
-}
+/**
+ * Pengaturan situs dibaca di hampir setiap halaman (lewat layout). Karena itu
+ * hasilnya di-cache lintas request dan di-dedupe per request.
+ *
+ * Cache diinvalidasi oleh `revalidateTag("settings")` di server action
+ * (lihat src/app/admin/actions.ts). TTL tetap dipasang sebagai jaring pengaman.
+ */
+const loadSettingsMap = unstable_cache(
+  async () => {
+    try {
+      const rows = await db.setting.findMany();
+      return Object.fromEntries(rows.map((row) => [row.key, row.value])) as Record<
+        string,
+        string
+      >;
+    } catch (error) {
+      // Jangan sampai build / halaman publik gagal total hanya karena tabel
+      // Setting belum bisa dibaca (mis. saat prerender di CI tanpa database).
+      console.error(
+        "[settings] gagal membaca tabel Setting, memakai nilai default:",
+        error instanceof Error ? error.message : error
+      );
+      return {} as Record<string, string>;
+    }
+  },
+  ["settings-map"],
+  { revalidate: 300, tags: ["settings"] }
+);
 
-export async function getBranding(): Promise<Branding> {
+export const getSettingsMap = cache(loadSettingsMap);
+
+export const getBranding = cache(async (): Promise<Branding> => {
   const values = await getSettingsMap();
   const pick = (key: string, fallback: string) => values[key]?.trim() || fallback;
 
@@ -76,4 +91,4 @@ export async function getBranding(): Promise<Branding> {
       DEFAULT_BRANDING.colorAccent
     ),
   };
-}
+});

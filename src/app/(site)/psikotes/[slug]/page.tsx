@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ShieldCheck } from "lucide-react";
-import { db } from "@/lib/db";
+import { getAssessmentBySlug } from "@/lib/content";
 import { AssessmentRunner } from "@/components/assessment-runner";
 import { safeJson } from "@/lib/utils";
 
@@ -20,7 +20,7 @@ export async function generateMetadata({
   params: Promise<{ slug: string }>;
 }): Promise<Metadata> {
   const { slug } = await params;
-  const assessment = await db.assessment.findUnique({ where: { slug } });
+  const assessment = await getAssessmentBySlug(slug);
   return { title: assessment?.title ?? "Asesmen" };
 }
 
@@ -30,7 +30,7 @@ export default async function AssessmentPage({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
-  const assessment = await db.assessment.findUnique({ where: { slug } });
+  const assessment = await getAssessmentBySlug(slug);
   if (!assessment || !assessment.isActive) notFound();
 
   const questions = safeJson<Question[]>(assessment.questions, []);

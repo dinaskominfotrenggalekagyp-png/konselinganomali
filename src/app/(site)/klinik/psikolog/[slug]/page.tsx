@@ -14,7 +14,7 @@ import {
   Users,
   Video,
 } from "lucide-react";
-import { db } from "@/lib/db";
+import { getPsychologistBySlug, getServices } from "@/lib/content";
 import { formatIDR } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
@@ -25,7 +25,7 @@ export async function generateMetadata({
   params: Promise<{ slug: string }>;
 }): Promise<Metadata> {
   const { slug } = await params;
-  const psychologist = await db.psychologist.findUnique({ where: { slug } });
+  const psychologist = await getPsychologistBySlug(slug);
   if (!psychologist) return { title: "Psikolog tidak ditemukan" };
   return {
     title: psychologist.name,
@@ -39,13 +39,12 @@ export default async function PsychologistPage({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
-  const psychologist = await db.psychologist.findUnique({ where: { slug } });
+  const psychologist = await getPsychologistBySlug(slug);
   if (!psychologist || !psychologist.isActive) notFound();
 
-  const services = await db.service.findMany({
-    where: { isActive: true, category: "Klinik" },
-    take: 3,
-  });
+  const services = (await getServices())
+    .filter((service) => service.category === "Klinik")
+    .slice(0, 3);
 
   const specialties = psychologist.specialties.split(",").map((s) => s.trim());
 
