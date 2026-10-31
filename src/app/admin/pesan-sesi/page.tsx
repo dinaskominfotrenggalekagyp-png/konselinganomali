@@ -1,5 +1,4 @@
 import Link from "next/link";
-import type { Prisma } from "@prisma/client";
 import {
   CalendarDays,
   MessageCircle,
@@ -28,21 +27,12 @@ export default async function AdminPesanSesiPage({
   const user = await requireStaff();
   const { ok, error } = await searchParams;
 
-  const psychologist =
-    user.role === "PSYCHOLOGIST"
-      ? await db.psychologist.findUnique({
-          where: { userId: user.id },
-          select: { id: true, name: true },
-        })
-      : null;
-
-  const where: Prisma.BookingWhereInput =
-    user.role === "PSYCHOLOGIST"
-      ? { psychologistId: psychologist?.id ?? "__none__" }
-      : {};
+  // Psikolog hanya boleh melihat sesi miliknya. Filter langsung lewat relasi
+  // supaya tidak perlu query Psychologist terpisah sebelum query Booking.
+  const scopedToSelf = user.role === "PSYCHOLOGIST";
 
   const bookings = await db.booking.findMany({
-    where,
+    where: scopedToSelf ? { psychologist: { is: { userId: user.id } } } : {},
     include: {
       service: { select: { name: true, duration: true } },
       psychologist: { select: { name: true } },
@@ -55,6 +45,8 @@ export default async function AdminPesanSesiPage({
     orderBy: [{ date: "desc" }, { time: "desc" }],
     take: 80,
   });
+
+  const psychologistName = scopedToSelf ? user.name : null;
 
   const threads = [...bookings].sort((a, b) => {
     const lastA = a.messages.at(-1)?.createdAt.getTime() ?? 0;
@@ -81,11 +73,11 @@ export default async function AdminPesanSesiPage({
           </h1>
           <p className="mt-1 text-[12px] text-muted">
             {totalMessages} pesan dalam {withMessages} percakapan
-            {psychologist ? ` · ${psychologist.name}` : ""} · balas pertanyaan
+            {psychologistName ? ` · ${psychologistName}` : ""} · balas pertanyaan
             klien tanpa meninggalkan admin console.
           </p>
         </div>
-        {psychologist && (
+        {psychologistName && (
           <span className="inline-flex w-fit items-center gap-1.5 rounded-full bg-brand-mint px-3 py-1.5 text-[10px] font-semibold text-brand-dark">
             <ShieldCheck className="h-3 w-3" /> Hanya data Anda
           </span>

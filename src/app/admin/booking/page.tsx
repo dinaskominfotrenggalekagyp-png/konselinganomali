@@ -52,13 +52,7 @@ export default async function AdminBookingPage({
   } = await searchParams;
   const month = /^\d{4}-\d{2}$/.test(rawMonth) ? rawMonth : "";
 
-  const psychologist =
-    user.role === "PSYCHOLOGIST"
-      ? await db.psychologist.findUnique({
-          where: { userId: user.id },
-          select: { id: true, name: true },
-        })
-      : null;
+  const psychologistName = user.role === "PSYCHOLOGIST" ? user.name : null;
 
   const pageNumber = Math.max(1, Number(page) || 1);
   const perPage = 15;
@@ -66,8 +60,9 @@ export default async function AdminBookingPage({
   const where: Prisma.BookingWhereInput = {
     ...(status !== "ALL" ? { status } : {}),
     ...(month ? { date: { startsWith: month } } : {}),
+    // Filter langsung lewat relasi: tidak perlu query Psychologist terpisah.
     ...(user.role === "PSYCHOLOGIST"
-      ? { psychologistId: psychologist?.id ?? "__none__" }
+      ? { psychologist: { is: { userId: user.id } } }
       : {}),
     ...(q
       ? {
@@ -130,7 +125,7 @@ export default async function AdminBookingPage({
           </h1>
           <p className="mt-1 text-[12px] text-muted">
             {total} booking · {month ? `periode ${formatMonth(month)}` : "semua periode"}
-            {psychologist ? ` · ${psychologist.name}` : ""} · ubah status untuk
+            {psychologistName ? ` · ${psychologistName}` : ""} · ubah status untuk
             mengonfirmasi, menolak, atau menutup sesi.
           </p>
         </div>

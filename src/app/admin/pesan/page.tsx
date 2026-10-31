@@ -16,16 +16,26 @@ export default async function AdminPesanPage({
   await requireAdmin();
   const { status = "ALL", ok, error } = await searchParams;
 
-  const messages = await db.contactMessage.findMany({
-    where: status === "ALL" ? {} : { status },
-    orderBy: { createdAt: "desc" },
-  });
+  const [messages, statusRows] = await Promise.all([
+    db.contactMessage.findMany({
+      where: status === "ALL" ? {} : { status },
+      orderBy: { createdAt: "desc" },
+    }),
+    // Satu query untuk semua hitungan status (sebelumnya 4 query berurutan).
+    db.contactMessage.groupBy({
+      by: ["status"],
+      _count: { _all: true },
+    }),
+  ]);
+
+  const countByStatus = (key: string) =>
+    statusRows.find((row) => row.status === key)?._count._all ?? 0;
 
   const counts = {
-    ALL: await db.contactMessage.count(),
-    NEW: await db.contactMessage.count({ where: { status: "NEW" } }),
-    READ: await db.contactMessage.count({ where: { status: "READ" } }),
-    REPLIED: await db.contactMessage.count({ where: { status: "REPLIED" } }),
+    ALL: statusRows.reduce((total, row) => total + row._count._all, 0),
+    NEW: countByStatus("NEW"),
+    READ: countByStatus("READ"),
+    REPLIED: countByStatus("REPLIED"),
   };
 
   return (
