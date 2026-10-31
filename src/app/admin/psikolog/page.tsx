@@ -1,8 +1,10 @@
 import Image from "next/image";
+import Link from "next/link";
 import {
   BadgeCheck,
   KeyRound,
   Mail,
+  Pencil,
   Plus,
   Save,
   Star,
@@ -157,19 +159,30 @@ export default async function AdminPsikologPage({
                 <span className="text-[9.5px] text-muted">
                   {isSuperadmin ? formatIDR(p.price) : "Harga aktif"}
                 </span>
-                <form action={togglePsychologistAction}>
-                  <input type="hidden" name="id" value={p.id} />
-                  <button
-                    type="submit"
-                    className={`rounded-full px-2.5 py-1 text-[9px] font-semibold ring-1 transition ${
-                      p.isActive
-                        ? "bg-brand-mint text-brand ring-brand/20 hover:bg-brand hover:text-white"
-                        : "bg-surface text-muted ring-line hover:text-ink"
-                    }`}
-                  >
-                    {p.isActive ? "Aktif" : "Nonaktif"}
-                  </button>
-                </form>
+                <div className="flex items-center gap-1.5">
+                  {isSuperadmin && (
+                    <Link
+                      href={`/admin/psikolog/${p.id}`}
+                      className="flex h-7 items-center gap-1 rounded-lg border border-line px-2 text-[9px] font-semibold text-ink/70 transition hover:border-brand/30 hover:text-brand-dark"
+                      aria-label={`Edit ${p.name}`}
+                    >
+                      <Pencil className="h-2.5 w-2.5" /> Edit
+                    </Link>
+                  )}
+                  <form action={togglePsychologistAction}>
+                    <input type="hidden" name="id" value={p.id} />
+                    <button
+                      type="submit"
+                      className={`rounded-full px-2.5 py-1 text-[9px] font-semibold ring-1 transition ${
+                        p.isActive
+                          ? "bg-brand-mint text-brand ring-brand/20 hover:bg-brand hover:text-white"
+                          : "bg-surface text-muted ring-line hover:text-ink"
+                      }`}
+                    >
+                      {p.isActive ? "Aktif" : "Nonaktif"}
+                    </button>
+                  </form>
+                </div>
               </div>
             </div>
           </div>
