@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Inter, Noto_Serif_Display } from "next/font/google";
+import { appBaseUrl } from "@/lib/app-url";
 import "./globals.css";
 
 const inter = Inter({
@@ -17,7 +18,7 @@ const serif = Noto_Serif_Display({
 });
 
 export const metadata: Metadata = {
-  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000"),
+  metadataBase: new URL(appBaseUrl()),
   title: {
     default: "Konseling Trenggalek — Asesmen Psikologi & Kesehatan Mental",
     template: "%s — Konseling Trenggalek",
