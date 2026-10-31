@@ -7,15 +7,15 @@ import { db } from "@/lib/db";
  *
  * Semua fungsi di sini di-cache lintas request (bukan hanya per request).
  * Tanpa ini, setiap perpindahan menu memicu 2–6 round trip ke database dan
- * terasa lambat. Data publik jarang berubah, jadi TTL 5 menit + invalidasi
- * lewat tag sudah memadai.
+ * terasa lambat. Data publik jarang berubah, jadi TTL 15 menit + invalidasi
+ * lewat tag sudah memadai (perubahan admin langsung membuang cache).
  *
  * Invalidate dengan `revalidateTag("services")` dsb. dari server action.
  * Catatan: nilai Date akan terserialisasi menjadi string ISO oleh cache,
  * karena itu `formatDate()` dibuat menerima string maupun Date.
  */
 
-const TTL = 300;
+const TTL = 900;
 
 export const getServices = unstable_cache(
   async () =>

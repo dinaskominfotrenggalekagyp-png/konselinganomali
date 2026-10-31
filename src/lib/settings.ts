@@ -34,7 +34,7 @@ const loadSettingsMap = unstable_cache(
     }
   },
   ["settings-map"],
-  { revalidate: 300, tags: ["settings"] }
+  { revalidate: 900, tags: ["settings"] }
 );
 
 export const getSettingsMap = cache(loadSettingsMap);

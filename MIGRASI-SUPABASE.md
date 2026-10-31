@@ -208,9 +208,12 @@ tersedia, dan hanya menulis ke `public/uploads` saat development lokal.
 4. **Build tanpa database** — semua halaman yang membaca DB sudah
    `force-dynamic`, jadi build tidak butuh koneksi DB. Env var tetap wajib untuk
    runtime.
-5. **Region** — project Supabase ada di `eu-north-1`. Idealnya region function
-   Vercel juga Eropa (mis. `fra1`) agar latensi rendah. Bisa diubah di
-   **Project Settings → Functions → Region**.
+5. **Region** — project Supabase ada di `eu-north-1` (Stockholm), sedangkan
+   pengunjung dan admin berada di Indonesia. Karena itu `vercel.json` mengunci
+   region function ke **`sin1` (Singapura)**: jarak ke pengunjung sangat dekat,
+   dan query database yang tersisa sudah ditekan oleh cache. Kalau suatu saat
+   data menjadi sangat sering berubah (cache jarang dipakai), region `arn1`
+   (Stockholm) bisa dipertimbangkan agar query langsung ke database ~0 ms.
 6. **`prisma generate`** — sudah ada di build script, tidak perlu `postinstall`.
 
 ### 7.1 Optimasi performa yang sudah diterapkan
@@ -218,7 +221,7 @@ tersedia, dan hanya menulis ke `public/uploads` saat development lokal.
 | Optimasi | Lokasi | Efek |
 |---|---|---|
 | Session pooler untuk runtime | `src/lib/db.ts` | ~1.700 ms → ~300 ms per query |
-| Cache data publik (TTL 5 menit + tag) | `src/lib/content.ts` | Perpindahan menu tidak lagi menunggu database |
+| Cache data publik (TTL 15 menit + tag) | `src/lib/content.ts` | Perpindahan menu tidak lagi menunggu database |
 | Cache pengaturan situs | `src/lib/settings.ts` | Layout tidak query `Setting` tiap request |
 | Dedupe user per request | `src/lib/auth.ts` (`cache()`) | Layout + page cukup 1 query user |
 | `after()` untuk hitungan views | `edukasi/[slug]/page.tsx` | Write tidak menahan response |
