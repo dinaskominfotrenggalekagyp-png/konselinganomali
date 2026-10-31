@@ -4,6 +4,7 @@ import path from "path";
 import { randomUUID } from "crypto";
 import { getSession } from "@/lib/auth";
 import { isSuperadminRole } from "@/lib/roles";
+import { storageConfig, storagePublicUrl } from "@/lib/storage";
 
 export const runtime = "nodejs";
 
@@ -15,19 +16,6 @@ const EXTENSIONS: Record<string, string> = {
   "image/webp": "webp",
   "image/gif": "gif",
 };
-
-const BUCKET = process.env.SUPABASE_STORAGE_BUCKET ?? "uploads";
-
-/**
- * Supabase Storage dipakai supaya upload tetap berfungsi di Vercel, karena
- * filesystem serverless bersifat read-only & ephemeral.
- */
-function supabaseStorage() {
-  const url = process.env.SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!url || !key) return null;
-  return { url: url.replace(/\/+$/, ""), key, bucket: BUCKET };
-}
 
 export async function POST(request: Request) {
   const session = await getSession();
@@ -62,7 +50,7 @@ export async function POST(request: Request) {
     const buffer = Buffer.from(await file.arrayBuffer());
 
     // --- Supabase Storage (produksi / Vercel) ---
-    const storage = supabaseStorage();
+    const storage = storageConfig();
     if (storage) {
       const response = await fetch(
         `${storage.url}/storage/v1/object/${storage.bucket}/${filename}`,
@@ -93,7 +81,8 @@ export async function POST(request: Request) {
 
       return NextResponse.json({
         ok: true,
-        url: `${storage.url}/storage/v1/object/public/${storage.bucket}/${filename}`,
+        url: storagePublicUrl(filename),
+        size: file.size,
       });
     }
 
@@ -113,7 +102,7 @@ export async function POST(request: Request) {
     await mkdir(uploadDir, { recursive: true });
     await writeFile(path.join(uploadDir, filename), buffer);
 
-    return NextResponse.json({ ok: true, url: `/uploads/${filename}` });
+    return NextResponse.json({ ok: true, url: `/uploads/${filename}`, size: file.size });
   } catch (error) {
     console.error("upload error", error);
     return NextResponse.json({ error: "Gagal mengunggah gambar" }, { status: 500 });

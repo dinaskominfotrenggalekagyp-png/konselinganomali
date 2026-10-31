@@ -2,8 +2,10 @@
 
 import { revalidatePath, revalidateTag } from "next/cache";
 import { redirect } from "next/navigation";
+import { after } from "next/server";
 import { z } from "zod";
 import { db } from "@/lib/db";
+import { deleteStorageObject } from "@/lib/storage";
 import {
   createSession,
   hashPassword,
@@ -449,6 +451,11 @@ export async function updatePsychologistDetailsAction(formData: FormData) {
     `${name} · ${email || psychologist.user?.email || "tanpa akun"}`
   );
 
+  const nextPhoto = photo || DEFAULT_PSYCHOLOGIST_PHOTO;
+  if (psychologist.photo && psychologist.photo !== nextPhoto) {
+    after(() => deleteStorageObject(psychologist.photo));
+  }
+
   revalidatePath("/admin/psikolog");
   revalidatePath(`/admin/psikolog/${id}`);
   revalidatePath("/admin/akun");
@@ -640,6 +647,11 @@ export async function saveArticleAction(formData: FormData) {
   }
 
   if (id) {
+    const previous = await db.article.findUnique({
+      where: { id },
+      select: { cover: true },
+    });
+
     await db.article.update({
       where: { id },
       data: {
@@ -654,6 +666,12 @@ export async function saveArticleAction(formData: FormData) {
         published: data.published,
       },
     });
+
+    // Cover lama di Storage dihapus setelah response (tidak menahan simpan).
+    if (previous?.cover && previous.cover !== cover) {
+      after(() => deleteStorageObject(previous.cover));
+    }
+
     await logActivity(admin.id, "ADMIN_UPDATE_ARTICLE", data.title);
   } else {
     await db.article.create({
@@ -848,6 +866,13 @@ export async function saveBrandingAction(formData: FormData) {
     return { key, value };
   });
 
+  const imageKeys = ["site.logo", "home.image", "home.valueImage"];
+  const previousRows = await db.setting.findMany({
+    where: { key: { in: imageKeys } },
+    select: { key: true, value: true },
+  });
+  const previousValues = new Map(previousRows.map((row) => [row.key, row.value]));
+
   await db.$transaction(
     entries.map((entry) =>
       db.setting.upsert({
@@ -857,6 +882,15 @@ export async function saveBrandingAction(formData: FormData) {
       })
     )
   );
+
+  // Gambar lama yang diganti ikut dihapus dari Storage setelah response.
+  for (const key of imageKeys) {
+    const oldValue = previousValues.get(key);
+    const newValue = entries.find((entry) => entry.key === key)?.value;
+    if (oldValue && oldValue !== newValue) {
+      after(() => deleteStorageObject(oldValue));
+    }
+  }
 
   await logActivity(actor.id, "BRANDING_UPDATED", "Identitas, beranda & tampilan");
   revalidatePath("/");

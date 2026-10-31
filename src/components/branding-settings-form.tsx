@@ -1,8 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
+  AlertCircle,
   Building2,
+  CheckCircle2,
   ImageIcon,
   LayoutTemplate,
   Loader2,
@@ -15,7 +17,8 @@ import {
   Upload,
 } from "lucide-react";
 import { saveBrandingAction } from "@/app/admin/actions";
-import { prepareImageForUpload } from "@/lib/image-client";
+import { errorMessage, isNextRedirectError } from "@/lib/action-errors";
+import { fileSizeKb, prepareImageForUpload } from "@/lib/image-client";
 import {
   DEFAULT_BRANDING,
   type Branding,
@@ -25,6 +28,14 @@ type Props = {
   values: Partial<Record<keyof Branding, string>>;
 };
 
+type ImageTarget = "logo" | "hero" | "value";
+
+const FIELD_NAME: Record<ImageTarget, string> = {
+  logo: "site.logo",
+  hero: "home.image",
+  value: "home.valueImage",
+};
+
 export function BrandingSettingsForm({ values }: Props) {
   const get = (key: keyof Branding) =>
     values[key]?.trim() || DEFAULT_BRANDING[key];
@@ -32,40 +43,130 @@ export function BrandingSettingsForm({ values }: Props) {
   const [logo, setLogo] = useState(get("logo"));
   const [heroImage, setHeroImage] = useState(get("heroImage"));
   const [valueImage, setValueImage] = useState(get("valueImage"));
-  const [uploading, setUploading] = useState<"" | "logo" | "hero" | "value">("");
-  const [error, setError] = useState("");
+  const [pending, setPending] = useState<Partial<Record<ImageTarget, File>>>({});
+  const [previews, setPreviews] = useState<Partial<Record<ImageTarget, string>>>({});
+  const [compressing, setCompressing] = useState<ImageTarget | "">("");
+  const [saving, setSaving] = useState(false);
+  const [status, setStatus] = useState<
+    { tone: "info" | "ok" | "error"; text: string } | null
+  >(null);
 
-  async function upload(
-    file: File,
-    target: "logo" | "hero" | "value",
-    setter: (value: string) => void
-  ) {
-    setUploading(target);
-    setError("");
+  const previewsRef = useRef(previews);
+  previewsRef.current = previews;
+
+  // Bersihkan object URL preview saat komponen dilepas.
+  useEffect(() => {
+    return () => {
+      Object.values(previewsRef.current).forEach((url) => {
+        if (url) URL.revokeObjectURL(url);
+      });
+    };
+  }, []);
+
+  function clearPending(target: ImageTarget) {
+    setPending((current) => {
+      const next = { ...current };
+      delete next[target];
+      return next;
+    });
+    setPreviews((current) => {
+      if (current[target]) URL.revokeObjectURL(current[target]!);
+      const next = { ...current };
+      delete next[target];
+      return next;
+    });
+  }
+
+  /** Pilih gambar → kompres di browser. Tidak diunggah sampai Simpan diklik. */
+  async function chooseImage(target: ImageTarget, file: File) {
+    setCompressing(target);
+    setStatus({ tone: "info", text: "Mengompres gambar..." });
     try {
       const prepared = await prepareImageForUpload(file);
-      const body = new FormData();
-      body.append("file", prepared);
-      const res = await fetch("/api/admin/upload", { method: "POST", body });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error ?? "Gagal mengunggah gambar");
-      setter(data.url);
+      clearPending(target);
+      setPending((current) => ({ ...current, [target]: prepared }));
+      setPreviews((current) => ({
+        ...current,
+        [target]: URL.createObjectURL(prepared),
+      }));
+      setStatus({
+        tone: "ok",
+        text: `Gambar siap (${fileSizeKb(prepared)} KB). Belum diunggah — klik Simpan untuk menyimpan.`,
+      });
     } catch (uploadError) {
-      setError(
-        uploadError instanceof Error
-          ? uploadError.message
-          : "Gagal mengunggah gambar"
-      );
+      clearPending(target);
+      setStatus({
+        tone: "error",
+        text: errorMessage(uploadError, "Gagal menyiapkan gambar."),
+      });
     } finally {
-      setUploading("");
+      setCompressing("");
     }
   }
 
+  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (saving || compressing) return;
+
+    const form = event.currentTarget;
+    const targets = Object.keys(pending) as ImageTarget[];
+    setSaving(true);
+    setStatus({
+      tone: "info",
+      text:
+        targets.length > 0
+          ? "Mengunggah gambar lalu menyimpan pengaturan..."
+          : "Menyimpan pengaturan...",
+    });
+
+    try {
+      const formData = new FormData(form);
+
+      for (const target of targets) {
+        const file = pending[target];
+        if (!file) continue;
+        const body = new FormData();
+        body.append("file", file);
+        const response = await fetch("/api/admin/upload", { method: "POST", body });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) {
+          throw new Error(data.error ?? "Gagal mengunggah gambar");
+        }
+        formData.set(FIELD_NAME[target], data.url);
+      }
+
+      await saveBrandingAction(formData);
+      // Sukses: server action redirect ke halaman dengan notifikasi.
+    } catch (uploadError) {
+      if (isNextRedirectError(uploadError)) throw uploadError;
+      setSaving(false);
+      setStatus({
+        tone: "error",
+        text: errorMessage(uploadError, "Gagal menyimpan pengaturan. Coba lagi."),
+      });
+    }
+  }
   return (
-    <form action={saveBrandingAction} className="space-y-4">
-      {error && (
-        <p className="rounded-xl bg-rose-50 px-4 py-3 text-[11px] font-medium text-rose-700">
-          {error}
+    <form action={saveBrandingAction} onSubmit={handleSubmit} className="space-y-4">
+      {status && (
+        <p
+          role="status"
+          className={`flex items-start gap-2 rounded-xl px-4 py-3 text-[11px] font-medium ${
+            status.tone === "ok"
+              ? "bg-emerald-50 text-emerald-700"
+              : status.tone === "error"
+                ? "bg-rose-50 text-rose-700"
+                : "bg-surface text-muted"
+          }`}
+        >
+          {status.tone === "ok" ? (
+            <CheckCircle2 className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+          ) : status.tone === "error" ? (
+            <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+          ) : (
+            <Loader2 className="mt-0.5 h-3.5 w-3.5 shrink-0 animate-spin" />
+          )}
+          {status.text}
         </p>
       )}
 
@@ -101,10 +202,10 @@ export function BrandingSettingsForm({ values }: Props) {
             <div>
               <label htmlFor="brand-logo" className="label">Logo (URL atau unggah)</label>
               <div className="flex items-center gap-2">
-                {logo ? (
+                {previews.logo || logo ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img
-                    src={logo}
+                    src={previews.logo ?? logo}
                     alt="Pratinjau logo"
                     className="h-11 w-11 shrink-0 rounded-xl border border-line object-contain"
                   />
@@ -117,12 +218,16 @@ export function BrandingSettingsForm({ values }: Props) {
                   id="brand-logo"
                   name="site.logo"
                   value={logo}
-                  onChange={(event) => setLogo(event.target.value)}
+                  onChange={(event) => {
+                    setLogo(event.target.value);
+                    clearPending("logo");
+                    setStatus(null);
+                  }}
                   placeholder="/uploads/logo.png atau https://..."
                   className="field"
                 />
                 <label className="flex h-[38px] shrink-0 cursor-pointer items-center gap-1.5 rounded-xl border border-line px-3 text-[10px] font-semibold text-ink/70 transition hover:border-brand/30 hover:text-brand">
-                  {uploading === "logo" ? (
+                  {compressing === "logo" ? (
                     <Loader2 className="h-3.5 w-3.5 animate-spin" />
                   ) : (
                     <Upload className="h-3.5 w-3.5" />
@@ -132,13 +237,20 @@ export function BrandingSettingsForm({ values }: Props) {
                     type="file"
                     accept="image/*"
                     className="hidden"
+                    disabled={saving}
                     onChange={(event) => {
                       const file = event.target.files?.[0];
-                      if (file) void upload(file, "logo", setLogo);
+                      if (file) void chooseImage("logo", file);
+                      event.target.value = "";
                     }}
                   />
                 </label>
               </div>
+              {pending.logo && (
+                <p className="mt-1 text-[9px] font-semibold uppercase tracking-wide text-amber-600">
+                  Logo belum diunggah — klik Simpan
+                </p>
+              )}
               <p className="mt-1 text-[9px] text-muted">
                 Kosongkan untuk memakai logo bawaan.
               </p>
@@ -337,10 +449,10 @@ export function BrandingSettingsForm({ values }: Props) {
           <div>
             <label htmlFor="hero-image" className="label">Gambar hero</label>
             <div className="flex items-center gap-2">
-              {heroImage ? (
+              {previews.hero || heroImage ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
-                  src={heroImage}
+                  src={previews.hero ?? heroImage}
                   alt="Pratinjau hero"
                   className="h-11 w-16 shrink-0 rounded-lg border border-line object-cover"
                 />
@@ -349,12 +461,16 @@ export function BrandingSettingsForm({ values }: Props) {
                 id="hero-image"
                 name="home.image"
                 value={heroImage}
-                onChange={(event) => setHeroImage(event.target.value)}
+                onChange={(event) => {
+                  setHeroImage(event.target.value);
+                  clearPending("hero");
+                  setStatus(null);
+                }}
                 placeholder="https://..."
                 className="field"
               />
               <label className="flex h-[38px] shrink-0 cursor-pointer items-center gap-1.5 rounded-xl border border-line px-3 text-[10px] font-semibold text-ink/70 transition hover:border-brand/30 hover:text-brand">
-                {uploading === "hero" ? (
+                {compressing === "hero" ? (
                   <Loader2 className="h-3.5 w-3.5 animate-spin" />
                 ) : (
                   <Upload className="h-3.5 w-3.5" />
@@ -364,21 +480,28 @@ export function BrandingSettingsForm({ values }: Props) {
                   type="file"
                   accept="image/*"
                   className="hidden"
+                  disabled={saving}
                   onChange={(event) => {
                     const file = event.target.files?.[0];
-                    if (file) void upload(file, "hero", setHeroImage);
+                    if (file) void chooseImage("hero", file);
+                    event.target.value = "";
                   }}
                 />
               </label>
             </div>
+            {pending.hero && (
+              <p className="mt-1 text-[9px] font-semibold uppercase tracking-wide text-amber-600">
+                Belum diunggah — klik Simpan
+              </p>
+            )}
           </div>
           <div>
             <label htmlFor="value-image" className="label">Gambar bagian pendekatan</label>
             <div className="flex items-center gap-2">
-              {valueImage ? (
+              {previews.value || valueImage ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
-                  src={valueImage}
+                  src={previews.value ?? valueImage}
                   alt="Pratinjau pendekatan"
                   className="h-11 w-16 shrink-0 rounded-lg border border-line object-cover"
                 />
@@ -387,12 +510,16 @@ export function BrandingSettingsForm({ values }: Props) {
                 id="value-image"
                 name="home.valueImage"
                 value={valueImage}
-                onChange={(event) => setValueImage(event.target.value)}
+                onChange={(event) => {
+                  setValueImage(event.target.value);
+                  clearPending("value");
+                  setStatus(null);
+                }}
                 placeholder="https://..."
                 className="field"
               />
               <label className="flex h-[38px] shrink-0 cursor-pointer items-center gap-1.5 rounded-xl border border-line px-3 text-[10px] font-semibold text-ink/70 transition hover:border-brand/30 hover:text-brand">
-                {uploading === "value" ? (
+                {compressing === "value" ? (
                   <Loader2 className="h-3.5 w-3.5 animate-spin" />
                 ) : (
                   <Upload className="h-3.5 w-3.5" />
@@ -402,28 +529,39 @@ export function BrandingSettingsForm({ values }: Props) {
                   type="file"
                   accept="image/*"
                   className="hidden"
+                  disabled={saving}
                   onChange={(event) => {
                     const file = event.target.files?.[0];
-                    if (file) void upload(file, "value", setValueImage);
+                    if (file) void chooseImage("value", file);
+                    event.target.value = "";
                   }}
                 />
               </label>
             </div>
+            {pending.value && (
+              <p className="mt-1 text-[9px] font-semibold uppercase tracking-wide text-amber-600">
+                Belum diunggah — klik Simpan
+              </p>
+            )}
           </div>
         </div>
       </div>
 
       <div className="flex items-center gap-2">
-        <button type="submit" className="btn-primary btn-sm" disabled={Boolean(uploading)}>
-          {uploading ? (
+        <button
+          type="submit"
+          className="btn-primary btn-sm"
+          disabled={saving || Boolean(compressing)}
+        >
+          {saving ? (
             <Loader2 className="h-3.5 w-3.5 animate-spin" />
           ) : (
             <Save className="h-3.5 w-3.5" />
           )}
-          Simpan branding &amp; beranda
+          {saving ? "Menyimpan..." : "Simpan branding & beranda"}
         </button>
         <p className="text-[9.5px] text-muted">
-          Perubahan berlaku untuk situs publik, portal, dan admin console.
+          Gambar dikompres ke ±100 KB dan baru diunggah saat Simpan diklik.
         </p>
       </div>
     </form>

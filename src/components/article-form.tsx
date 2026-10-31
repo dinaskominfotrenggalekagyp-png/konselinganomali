@@ -1,9 +1,18 @@
 "use client";
 
-import { useState } from "react";
-import { ImageIcon, Loader2, Save, Sparkles, Upload } from "lucide-react";
+import { useEffect, useState } from "react";
+import {
+  AlertCircle,
+  CheckCircle2,
+  ImageIcon,
+  Loader2,
+  Save,
+  Sparkles,
+  Upload,
+} from "lucide-react";
 import { saveArticleAction } from "@/app/admin/actions";
-import { prepareImageForUpload } from "@/lib/image-client";
+import { errorMessage, isNextRedirectError } from "@/lib/action-errors";
+import { fileSizeKb, prepareImageForUpload } from "@/lib/image-client";
 import { slugify } from "@/lib/utils";
 
 type ArticleFormProps = {
@@ -36,24 +45,87 @@ export function ArticleForm({ article }: ArticleFormProps) {
   const [slugTouched, setSlugTouched] = useState(Boolean(article));
   const [content, setContent] = useState(article?.content ?? "");
   const [cover, setCover] = useState(article?.cover ?? "");
-  const [uploading, setUploading] = useState(false);
-  const [uploadError, setUploadError] = useState("");
+  const [pendingCover, setPendingCover] = useState<File | null>(null);
+  const [coverPreview, setCoverPreview] = useState<string | null>(null);
+  const [compressing, setCompressing] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [status, setStatus] = useState<
+    { tone: "info" | "ok" | "error"; text: string } | null
+  >(null);
 
-  async function uploadCover(file: File) {
-    setUploading(true);
-    setUploadError("");
+  // Bersihkan object URL preview saat diganti / komponen dilepas.
+  useEffect(() => {
+    return () => {
+      if (coverPreview) URL.revokeObjectURL(coverPreview);
+    };
+  }, [coverPreview]);
+
+  /** Pilih gambar → kompres di browser. Belum diunggah sampai tombol Simpan. */
+  async function chooseCover(file: File) {
+    setCompressing(true);
+    setStatus({ tone: "info", text: "Mengompres gambar..." });
     try {
       const prepared = await prepareImageForUpload(file);
-      const body = new FormData();
-      body.append("file", prepared);
-      const res = await fetch("/api/admin/upload", { method: "POST", body });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error ?? "Gagal mengunggah gambar");
-      setCover(data.url);
+      setPendingCover(prepared);
+      setCoverPreview(URL.createObjectURL(prepared));
+      setStatus({
+        tone: "ok",
+        text: `Gambar siap (${fileSizeKb(prepared)} KB). Belum diunggah — klik Simpan untuk menyimpan.`,
+      });
     } catch (error) {
-      setUploadError(error instanceof Error ? error.message : "Gagal mengunggah gambar");
+      setPendingCover(null);
+      setCoverPreview(null);
+      setStatus({
+        tone: "error",
+        text: errorMessage(error, "Gagal menyiapkan gambar."),
+      });
     } finally {
-      setUploading(false);
+      setCompressing(false);
+    }
+  }
+
+  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (saving || compressing) return;
+
+    const form = event.currentTarget;
+    setSaving(true);
+    setStatus({
+      tone: "info",
+      text: pendingCover
+        ? "Mengunggah gambar lalu menyimpan artikel..."
+        : "Menyimpan artikel...",
+    });
+
+    try {
+      let coverUrl = cover;
+
+      if (pendingCover) {
+        const body = new FormData();
+        body.append("file", pendingCover);
+        const response = await fetch("/api/admin/upload", { method: "POST", body });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) {
+          throw new Error(data.error ?? "Gagal mengunggah gambar");
+        }
+        coverUrl = data.url;
+        setCover(coverUrl);
+        setPendingCover(null);
+        setCoverPreview(null);
+      }
+
+      const formData = new FormData(form);
+      formData.set("cover", coverUrl);
+
+      await saveArticleAction(formData);
+      // Sukses: server action melakukan redirect ke halaman dengan notifikasi.
+    } catch (error) {
+      if (isNextRedirectError(error)) throw error;
+      setSaving(false);
+      setStatus({
+        tone: "error",
+        text: errorMessage(error, "Gagal menyimpan artikel. Coba lagi."),
+      });
     }
   }
 
@@ -65,7 +137,11 @@ export function ArticleForm({ article }: ArticleFormProps) {
     .map((line) => line.replace("## ", "").trim());
 
   return (
-    <form action={saveArticleAction} className="grid gap-4 lg:grid-cols-[1.55fr_1fr]">
+    <form
+      action={saveArticleAction}
+      onSubmit={handleSubmit}
+      className="grid gap-4 lg:grid-cols-[1.55fr_1fr]"
+    >
       {article && <input type="hidden" name="id" value={article.id} />}
 
       <div className="space-y-4">
@@ -247,52 +323,95 @@ export function ArticleForm({ article }: ArticleFormProps) {
             name="cover"
             type="text"
             value={cover}
-            onChange={(event) => setCover(event.target.value)}
+            onChange={(event) => {
+              setCover(event.target.value);
+              // Mengetik URL manual membatalkan gambar yang menunggu diunggah.
+              setPendingCover(null);
+              setCoverPreview(null);
+              setStatus(null);
+            }}
             placeholder="https://images.unsplash.com/... atau /uploads/..."
             className="field text-[11px]"
           />
 
           <label className="mt-2 flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed border-brand/30 bg-brand-mint/30 px-3 py-2.5 text-[10.5px] font-medium text-brand-dark transition hover:bg-brand-mint">
-            {uploading ? (
+            {compressing ? (
               <Loader2 className="h-3.5 w-3.5 animate-spin" />
             ) : (
               <Upload className="h-3.5 w-3.5" />
             )}
-            {uploading ? "Mengunggah..." : "Unggah gambar dari perangkat"}
+            {compressing ? "Mengompres gambar..." : "Pilih gambar dari perangkat"}
             <input
               type="file"
               accept="image/png,image/jpeg,image/webp,image/gif"
               className="hidden"
-              disabled={uploading}
+              disabled={compressing || saving}
               onChange={(event) => {
                 const file = event.target.files?.[0];
-                if (file) void uploadCover(file);
+                if (file) void chooseCover(file);
                 event.target.value = "";
               }}
             />
           </label>
 
-          {uploadError && (
-            <p className="mt-1.5 text-[9.5px] font-medium text-rose-600">{uploadError}</p>
+          {status && (
+            <p
+              role="status"
+              className={`mt-2 flex items-start gap-1.5 rounded-lg px-2.5 py-2 text-[9.5px] font-medium ${
+                status.tone === "ok"
+                  ? "bg-emerald-50 text-emerald-700"
+                  : status.tone === "error"
+                    ? "bg-rose-50 text-rose-700"
+                    : "bg-surface text-muted"
+              }`}
+            >
+              {status.tone === "ok" ? (
+                <CheckCircle2 className="mt-0.5 h-3 w-3 shrink-0" />
+              ) : status.tone === "error" ? (
+                <AlertCircle className="mt-0.5 h-3 w-3 shrink-0" />
+              ) : (
+                <Loader2 className="mt-0.5 h-3 w-3 shrink-0 animate-spin" />
+              )}
+              {status.text}
+            </p>
           )}
 
-          {cover && (
+          {pendingCover && (
+            <p className="mt-1.5 text-[9px] font-semibold uppercase tracking-wide text-amber-600">
+              Gambar belum diunggah — klik Simpan
+            </p>
+          )}
+
+          {(coverPreview || cover) && (
             <div className="relative mt-2 h-28 overflow-hidden rounded-xl border border-line bg-surface">
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={cover} alt="Pratinjau cover" className="h-full w-full object-cover" />
+              <img
+                src={coverPreview ?? cover}
+                alt="Pratinjau cover"
+                className="h-full w-full object-cover"
+              />
             </div>
           )}
 
           <p className="mt-1.5 flex items-start gap-1 text-[9.5px] leading-relaxed text-muted">
             <ImageIcon className="mt-0.5 h-3 w-3 shrink-0" />
-            Unggah JPG/PNG/WebP (maks. 5 MB) atau tempel URL. Gunakan gambar landscape
-            minimal 1200×675 px. Kosongkan untuk memakai cover default.
+            JPG/PNG/WebP/GIF. Gambar otomatis dikompres ke ±100 KB dan baru
+            diunggah saat kamu klik Simpan. Gunakan gambar landscape minimal
+            1200×675 px.
           </p>
         </div>
 
-        <button type="submit" className="btn-primary btn-sm w-full">
-          <Save className="h-3.5 w-3.5" />
-          {article ? "Simpan perubahan" : "Simpan artikel"}
+        <button type="submit" className="btn-primary btn-sm w-full" disabled={saving || compressing}>
+          {saving ? (
+            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+          ) : (
+            <Save className="h-3.5 w-3.5" />
+          )}
+          {saving
+            ? "Menyimpan..."
+            : article
+              ? "Simpan perubahan"
+              : "Simpan artikel"}
         </button>
       </div>
     </form>

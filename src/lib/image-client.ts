@@ -1,20 +1,43 @@
 /**
- * Persiapan gambar di sisi klien sebelum diunggah.
+ * Penyiapan gambar di sisi klien sebelum diunggah.
  *
- * Dua masalah nyata yang diselesaikan di sini:
+ * Tujuan:
+ *  - Menekan ukuran file ke sekitar 100 KB agar unggahan cepat dan hemat
+ *    storage/kuota (foto kamera ponsel bisa 3–8 MB).
+ *  - Menghindari batas body request Vercel (±4,5 MB) yang membuat upload gagal
+ *    sebelum sampai ke aplikasi.
  *
- * 1. Vercel membatasi body request function ±4,5 MB. Foto dari kamera ponsel
- *    sering 3–8 MB sehingga upload gagal sebelum sampai ke aplikasi.
- * 2. Supabase Storage menyimpan file apa adanya; gambar 12 MP tidak perlu
- *    disimpan penuh untuk cover/logo.
+ * Gambar diperkecil bertahap (1600 px → 640 px) dan kualitasnya diturunkan
+ * sampai di bawah target. Format WebP dipakai karena mendukung transparansi
+ * (penting untuk logo) sekaligus jauh lebih kecil dari PNG/JPEG.
  *
- * Gambar diperkecil ke maksimal 1920 px (sisi terpanjang) dan dikonversi ke
- * JPEG kualitas 0.85 bila terlalu besar. GIF dibiarkan apa adanya agar
- * animasinya tidak hilang.
+ * GIF tidak diubah agar animasinya tetap hidup.
  */
-const MAX_UPLOAD_BYTES = 4 * 1024 * 1024; // batas aman di bawah 4,5 MB Vercel
-const MAX_DIMENSION = 1920;
-const JPEG_QUALITY = 0.85;
+const TARGET_BYTES = 100 * 1024;
+const DIMENSIONS = [1600, 1280, 1024, 800, 640];
+const QUALITIES = [0.82, 0.72, 0.62, 0.52, 0.42];
+const HARD_LIMIT = 4 * 1024 * 1024;
+
+let webpSupported: boolean | null = null;
+
+function supportsWebp() {
+  if (webpSupported !== null) return webpSupported;
+  try {
+    const canvas = document.createElement("canvas");
+    canvas.width = 1;
+    canvas.height = 1;
+    webpSupported = canvas.toDataURL("image/webp").startsWith("data:image/webp");
+  } catch {
+    webpSupported = false;
+  }
+  return webpSupported;
+}
+
+function toBlob(canvas: HTMLCanvasElement, type: string, quality: number) {
+  return new Promise<Blob | null>((resolve) => {
+    canvas.toBlob((blob) => resolve(blob), type, quality);
+  });
+}
 
 export async function prepareImageForUpload(file: File): Promise<File> {
   if (typeof document === "undefined") return file;
@@ -23,36 +46,65 @@ export async function prepareImageForUpload(file: File): Promise<File> {
   try {
     const bitmap = await createImageBitmap(file);
     const longestSide = Math.max(bitmap.width, bitmap.height);
-    const scale = Math.min(1, MAX_DIMENSION / longestSide);
 
-    if (scale === 1 && file.size <= MAX_UPLOAD_BYTES) {
+    // Sudah kecil dan tidak perlu diperkecil: kirim apa adanya.
+    if (file.size <= TARGET_BYTES && longestSide <= DIMENSIONS[0]) {
       bitmap.close?.();
       return file;
     }
 
-    const canvas = document.createElement("canvas");
-    canvas.width = Math.max(1, Math.round(bitmap.width * scale));
-    canvas.height = Math.max(1, Math.round(bitmap.height * scale));
+    const mime = supportsWebp()
+      ? "image/webp"
+      : file.type === "image/png"
+        ? "image/png"
+        : "image/jpeg";
+    const extension = mime === "image/webp" ? "webp" : mime === "image/png" ? "png" : "jpg";
 
-    const context = canvas.getContext("2d");
-    if (!context) {
-      bitmap.close?.();
-      return file;
+    let smallest: Blob | null = null;
+
+    for (const maxDimension of DIMENSIONS) {
+      const scale = Math.min(1, maxDimension / longestSide);
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.max(1, Math.round(bitmap.width * scale));
+      canvas.height = Math.max(1, Math.round(bitmap.height * scale));
+
+      const context = canvas.getContext("2d");
+      if (!context) break;
+      context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+
+      for (const quality of QUALITIES) {
+        const blob = await toBlob(canvas, mime, quality);
+        if (!blob || blob.size === 0) continue;
+        if (!smallest || blob.size < smallest.size) smallest = blob;
+        if (blob.size <= TARGET_BYTES) {
+          bitmap.close?.();
+          return new File([blob], renameFile(file.name, extension), { type: mime });
+        }
+      }
     }
 
-    context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
     bitmap.close?.();
 
-    const blob = await new Promise<Blob | null>((resolve) =>
-      canvas.toBlob(resolve, "image/jpeg", JPEG_QUALITY)
-    );
+    if (!smallest) return file;
 
-    if (!blob || blob.size === 0) return file;
+    if (smallest.size > HARD_LIMIT) {
+      throw new Error("Gambar terlalu besar. Coba gambar lain atau perkecil dulu.");
+    }
 
-    const baseName = file.name.replace(/\.[^.]+$/, "") || "gambar";
-    return new File([blob], `${baseName}.jpg`, { type: "image/jpeg" });
-  } catch {
-    // Kalau browser tidak mendukung canvas/createImageBitmap, unggah aslinya.
+    return new File([smallest], renameFile(file.name, extension), { type: mime });
+  } catch (error) {
+    if (error instanceof Error && error.message.includes("terlalu besar")) throw error;
+    // Browser tanpa dukungan canvas/createImageBitmap: unggah aslinya.
     return file;
   }
+}
+
+function renameFile(name: string, extension: string) {
+  const baseName = name.replace(/\.[^.]+$/, "") || "gambar";
+  return `${baseName}.${extension}`;
+}
+
+/** Ukuran file dalam KB untuk ditampilkan di UI. */
+export function fileSizeKb(file: File) {
+  return Math.max(1, Math.round(file.size / 1024));
 }
