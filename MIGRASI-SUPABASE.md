@@ -209,11 +209,13 @@ tersedia, dan hanya menulis ke `public/uploads` saat development lokal.
    `force-dynamic`, jadi build tidak butuh koneksi DB. Env var tetap wajib untuk
    runtime.
 5. **Region** — project Supabase ada di `eu-north-1` (Stockholm), sedangkan
-   pengunjung dan admin berada di Indonesia. Karena itu `vercel.json` mengunci
-   region function ke **`sin1` (Singapura)**: jarak ke pengunjung sangat dekat,
-   dan query database yang tersisa sudah ditekan oleh cache. Kalau suatu saat
-   data menjadi sangat sering berubah (cache jarang dipakai), region `arn1`
-   (Stockholm) bisa dipertimbangkan agar query langsung ke database ~0 ms.
+   pengunjung dan admin berada di Indonesia. `vercel.json` mengunci seluruh
+   function ke **`sin1` (Singapura)** karena itu yang paling dekat ke pengunjung.
+   Catatan: `preferredRegion` per-route (mis. admin di `arn1`) **diabaikan pada
+   paket Hobby** — sudah diuji dan function tetap jatuh ke region default, jadi
+   jangan diandalkan. Kalau admin terasa lambat, langkah paling berdampak adalah
+   memindahkan project Supabase ke region Singapura (`ap-southeast-1`), bukan
+   memindahkan function.
 6. **`prisma generate`** — sudah ada di build script, tidak perlu `postinstall`.
 
 ### 7.1 Optimasi performa yang sudah diterapkan
