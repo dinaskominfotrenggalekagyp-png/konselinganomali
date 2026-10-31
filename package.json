@@ -17,6 +17,7 @@
     "db:migrate:sqlite": "node prisma/migrate-sqlite-to-mysql.mjs",
     "db:migrate:supabase": "node prisma/migrate-mysql-to-supabase.mjs",
     "db:rls": "prisma db execute --file prisma/supabase-rls.sql --schema prisma/schema.prisma",
+    "db:storage": "prisma db execute --file prisma/supabase-storage.sql --schema prisma/schema.prisma",
     "db:rebrand": "node prisma/rebrand-existing.mjs",
     "setup": "prisma generate && prisma db push && tsx prisma/seed.ts"
   },

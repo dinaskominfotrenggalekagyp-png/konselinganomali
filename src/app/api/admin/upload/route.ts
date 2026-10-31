@@ -7,7 +7,7 @@ import { isSuperadminRole } from "@/lib/roles";
 
 export const runtime = "nodejs";
 
-const MAX_SIZE = 5 * 1024 * 1024;
+const MAX_SIZE = 4 * 1024 * 1024; // di bawah batas body Vercel (±4,5 MB)
 
 const EXTENSIONS: Record<string, string> = {
   "image/jpeg": "jpg",
@@ -52,7 +52,10 @@ export async function POST(request: Request) {
     }
 
     if (file.size > MAX_SIZE) {
-      return NextResponse.json({ error: "Ukuran gambar maksimal 5 MB" }, { status: 400 });
+      return NextResponse.json(
+        { error: "Ukuran gambar maksimal 4 MB. Kompres dulu fotonya." },
+        { status: 400 }
+      );
     }
 
     const filename = `${Date.now()}-${randomUUID().slice(0, 8)}.${extension}`;
@@ -79,7 +82,11 @@ export async function POST(request: Request) {
         const detail = await response.text().catch(() => "");
         console.error("supabase storage error", response.status, detail);
         return NextResponse.json(
-          { error: "Gagal mengunggah gambar ke storage" },
+          {
+            error: `Gagal mengunggah gambar ke storage (${response.status}). ${detail
+              .replace(/\s+/g, " ")
+              .slice(0, 180)}`,
+          },
           { status: 502 }
         );
       }

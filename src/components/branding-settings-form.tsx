@@ -15,6 +15,7 @@ import {
   Upload,
 } from "lucide-react";
 import { saveBrandingAction } from "@/app/admin/actions";
+import { prepareImageForUpload } from "@/lib/image-client";
 import {
   DEFAULT_BRANDING,
   type Branding,
@@ -42,8 +43,9 @@ export function BrandingSettingsForm({ values }: Props) {
     setUploading(target);
     setError("");
     try {
+      const prepared = await prepareImageForUpload(file);
       const body = new FormData();
-      body.append("file", file);
+      body.append("file", prepared);
       const res = await fetch("/api/admin/upload", { method: "POST", body });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "Gagal mengunggah gambar");

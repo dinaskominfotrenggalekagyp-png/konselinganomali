@@ -185,10 +185,23 @@ paralel bisa saling bertabrakan. Jalankan manual atau lewat CI.
 
 ### Supabase Storage (upload gambar)
 
-Buat bucket **`uploads`** dan set **Public** di
-**Storage → New bucket**, lalu isi `SUPABASE_SERVICE_ROLE_KEY` di Vercel.
+Bucket **`uploads`** (Public) bisa dibuat otomatis lewat:
+
+```bash
+npm run db:storage
+```
+
+Perintah itu menjalankan `prisma/supabase-storage.sql` (membuat bucket + policy
+baca publik). Tanpa bucket ini, upload akan gagal dengan pesan
+`Gagal mengunggah gambar ke storage (404)`.
+
+Isi juga `SUPABASE_URL` dan `SUPABASE_SERVICE_ROLE_KEY` di Vercel.
 `src/app/api/admin/upload/route.ts` otomatis memakai Storage bila kedua env var
 tersedia, dan hanya menulis ke `public/uploads` saat development lokal.
+
+Batas ukuran file 4 MB (di bawah limit body Vercel ±4,5 MB). Foto dari ponsel
+diperkecil otomatis di browser (maks. 1920 px, JPEG 0.85) sebelum diunggah,
+lihat `src/lib/image-client.ts`.
 
 ---
 

@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { ImageIcon, Loader2, Save, Sparkles, Upload } from "lucide-react";
 import { saveArticleAction } from "@/app/admin/actions";
+import { prepareImageForUpload } from "@/lib/image-client";
 import { slugify } from "@/lib/utils";
 
 type ArticleFormProps = {
@@ -42,8 +43,9 @@ export function ArticleForm({ article }: ArticleFormProps) {
     setUploading(true);
     setUploadError("");
     try {
+      const prepared = await prepareImageForUpload(file);
       const body = new FormData();
-      body.append("file", file);
+      body.append("file", prepared);
       const res = await fetch("/api/admin/upload", { method: "POST", body });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "Gagal mengunggah gambar");
