@@ -3,6 +3,13 @@ import { Inter, Noto_Serif_Display } from "next/font/google";
 import { appBaseUrl } from "@/lib/app-url";
 import "./globals.css";
 
+/**
+ * Default region untuk halaman publik: Singapura, dekat dengan pengunjung.
+ * Area admin/portal menimpanya ke `arn1` (lihat layout masing-masing) agar
+ * query database Supabase (Stockholm) tidak menyeberang benua.
+ */
+export const preferredRegion = "sin1";
+
 const inter = Inter({
   subsets: ["latin"],
   variable: "--font-inter",
