@@ -6,6 +6,14 @@ import { AdminLive } from "@/components/admin-live";
 import { getBranding } from "@/lib/settings";
 import { brandingCssVars } from "@/lib/branding";
 
+/**
+ * Admin console berisi banyak query langsung (tanpa cache). Supabase berada di
+ * Stockholm, jadi khusus area admin/portal function dijalankan di region yang
+ * sama (`arn1`) agar setiap query hanya ~beberapa ms, bukan ~200 ms.
+ * Halaman publik tetap di `sin1` (lihat vercel.json) agar dekat pengunjung.
+ */
+export const preferredRegion = "arn1";
+
 export default async function AdminLayout({
   children,
 }: {

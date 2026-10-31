@@ -3,6 +3,9 @@ import { PortalNav } from "@/components/portal-nav";
 import { getBranding } from "@/lib/settings";
 import { brandingCssVars } from "@/lib/branding";
 
+/** Portal berisi query per pengguna; jalankan dekat database (Stockholm). */
+export const preferredRegion = "arn1";
+
 export default async function PortalLayout({
   children,
 }: {
