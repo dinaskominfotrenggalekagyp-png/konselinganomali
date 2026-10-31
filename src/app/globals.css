@@ -1,0 +1,167 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --brand: 14 165 233;
+  --brand-dark: 3 105 161;
+  --brand-deep: 12 74 110;
+  --brand-mint: 224 242 254;
+  --brand-accent: 125 211 252;
+}
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    @apply bg-cream font-sans text-ink antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  ::selection {
+    @apply bg-brand-accent/40 text-brand-deep;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4 {
+    @apply font-serif;
+  }
+
+  :focus-visible {
+    @apply outline-none ring-2 ring-brand/40 ring-offset-2 ring-offset-white;
+  }
+}
+
+@layer components {
+  .shell {
+    @apply mx-auto w-full max-w-shell px-5 sm:px-8;
+  }
+
+  .shell-wide {
+    @apply mx-auto w-full max-w-[1400px] px-5 sm:px-10;
+  }
+
+  .eyebrow {
+    @apply inline-flex items-center gap-2 rounded-full border border-brand/15 bg-white/70 px-3.5 py-1.5 text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-dark backdrop-blur;
+  }
+
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-full px-6 py-3.5 text-sm font-medium transition-all duration-200 disabled:cursor-not-allowed disabled:opacity-60;
+  }
+
+  .btn-primary {
+    @apply btn bg-brand-dark text-white shadow-[0_12px_28px_rgba(3,105,161,0.24)] hover:-translate-y-0.5 hover:bg-brand;
+  }
+
+  .btn-accent {
+    @apply btn bg-brand-accent text-brand-deep hover:-translate-y-0.5 hover:bg-[#38bdf8];
+  }
+
+  .btn-outline {
+    @apply btn border border-line bg-white/70 text-ink hover:border-brand/40 hover:text-brand-dark;
+  }
+
+  .btn-ghost {
+    @apply btn text-brand-dark hover:bg-brand-mint;
+  }
+
+  .btn-sm {
+    @apply px-4 py-2.5 text-xs;
+  }
+
+  .btn-lg {
+    @apply px-7 py-4 text-base;
+  }
+
+  .card {
+    @apply rounded-3xl border border-line/80 bg-white shadow-soft;
+  }
+
+  .field {
+    @apply w-full rounded-2xl border border-line bg-white px-4 py-3 text-sm text-ink outline-none transition placeholder:text-muted/60 focus:border-brand/50 focus:ring-4 focus:ring-brand/10;
+  }
+
+  .label {
+    @apply mb-1.5 block text-xs font-semibold uppercase tracking-wide text-ink/60;
+  }
+
+  .chip {
+    @apply inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold;
+  }
+
+  .serif-italic {
+    @apply font-serif italic;
+  }
+
+  .section {
+    @apply py-16 sm:py-24;
+  }
+
+  .grid-lines {
+    background-image: linear-gradient(to right, rgba(14, 165, 233, 0.07) 1px, transparent 1px),
+      linear-gradient(to bottom, rgba(14, 165, 233, 0.07) 1px, transparent 1px);
+    background-size: 56px 56px;
+  }
+}
+
+@layer utilities {
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+
+  .reveal {
+    opacity: 0;
+    transform: translateY(28px);
+    transition: opacity 0.7s cubic-bezier(0.22, 1, 0.36, 1),
+      transform 0.7s cubic-bezier(0.22, 1, 0.36, 1);
+    transition-delay: var(--reveal-delay, 0ms);
+    will-change: opacity, transform;
+  }
+
+  .reveal.in-view {
+    opacity: 1;
+    transform: translateY(0);
+  }
+
+  .balance {
+    text-wrap: balance;
+  }
+}
+
+/* Prose untuk artikel edukasi */
+.prose-wc {
+  @apply text-[15.5px] leading-[1.85] text-ink/80;
+}
+.prose-wc h2 {
+  @apply mb-3 mt-10 font-serif text-2xl font-semibold text-brand-deep;
+}
+.prose-wc h3 {
+  @apply mb-2 mt-8 font-serif text-xl font-semibold text-brand-deep;
+}
+.prose-wc p {
+  @apply mb-4;
+}
+.prose-wc ul {
+  @apply mb-5 space-y-2 pl-5;
+}
+.prose-wc ol {
+  @apply mb-5 list-decimal space-y-2 pl-5;
+}
+.prose-wc li {
+  @apply marker:text-brand;
+}
+.prose-wc strong {
+  @apply font-semibold text-ink;
+}
+.prose-wc a {
+  @apply text-brand underline decoration-brand/30 underline-offset-4;
+}

@@ -1,0 +1,247 @@
+// Prisma schema — Konseling Trenggalek (clone platform asesmen psikologi)
+// Database: MySQL / MariaDB (XAMPP). Jalankan `npm run setup` untuk
+// membuat tabel + seed, atau `npm run db:migrate:sqlite` untuk memindahkan
+// data dari prisma/dev.db.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String   @id @default(cuid())
+  name         String
+  email        String   @unique
+  passwordHash String
+  phone        String?
+  role         String   @default("CLIENT") // SUPERADMIN | ADMIN | PSYCHOLOGIST | CLIENT
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  bookings        Booking[]
+  results         AssessmentResult[]
+  moods           MoodEntry[]
+  activities      ActivityLog[]
+  sessionMessages SessionMessage[]
+  psychologist    Psychologist?
+}
+
+model Psychologist {
+  id          String  @id @default(cuid())
+  userId      String? @unique
+  name        String
+  slug        String  @unique
+  title       String
+  specialties String  @db.Text // dipisah koma
+  bio         String  @db.Text
+  photo       String
+  price       Int
+  rating      Float   @default(4.9)
+  reviews     Int     @default(0)
+  experience  Int     @default(5)
+  education   String? @db.Text
+  isActive    Boolean @default(true)
+
+  user     User?     @relation(fields: [userId], references: [id])
+  bookings Booking[]
+}
+
+model Service {
+  id          String  @id @default(cuid())
+  name        String
+  slug        String  @unique
+  category    String // Klinik | Edukasi | Psikotes
+  tagline     String  @db.Text
+  description String  @db.Text
+  price       Int
+  duration    Int
+  image       String
+  icon        String  @default("heart")
+  highlights  String  @db.Text @default("[]") // JSON string
+  isFeatured  Boolean @default(false)
+  isActive    Boolean @default(true)
+
+  bookings Booking[]
+}
+
+model Booking {
+  id             String   @id @default(cuid())
+  code           String   @unique
+  userId         String?
+  guestName      String
+  guestEmail     String
+  guestPhone     String
+  serviceId      String
+  psychologistId String?
+  date           String // YYYY-MM-DD
+  time           String // HH:mm
+  mode           String   @default("ONLINE") // ONLINE | OFFLINE
+  notes          String?  @db.Text
+  status         String   @default("PENDING") // PENDING | CONFIRMED | REJECTED | ONGOING | COMPLETED | CANCELLED
+  paymentStatus  String   @default("UNPAID") // UNPAID | PAID | REFUNDED
+  amount         Int
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  user         User?         @relation(fields: [userId], references: [id])
+  service      Service       @relation(fields: [serviceId], references: [id])
+  psychologist Psychologist? @relation(fields: [psychologistId], references: [id])
+  invoice      Invoice?
+  messages     SessionMessage[]
+
+  @@index([date])
+  @@index([status])
+}
+
+model SessionMessage {
+  id        String   @id @default(cuid())
+  bookingId String
+  userId    String
+  body      String   @db.Text
+  createdAt DateTime @default(now())
+
+  booking Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([bookingId])
+  @@index([userId])
+}
+
+model Invoice {
+  id          String    @id @default(cuid())
+  number      String    @unique
+  bookingId   String    @unique
+  amount      Int
+  status      String    @default("UNPAID") // UNPAID | PAID | EXPIRED
+  provider    String    @default("mock")
+  providerRef String?
+  paidAt      DateTime?
+  createdAt   DateTime  @default(now())
+
+  booking Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+}
+
+model Article {
+  id          String   @id @default(cuid())
+  title       String
+  slug        String   @unique
+  category    String
+  excerpt     String   @db.Text
+  content     String   @db.LongText
+  cover       String
+  author      String
+  readMinutes Int      @default(4)
+  views       Int      @default(0)
+  published   Boolean  @default(true)
+  publishedAt DateTime @default(now())
+  createdAt   DateTime @default(now())
+}
+
+model Assessment {
+  id          String  @id @default(cuid())
+  title       String
+  slug        String  @unique
+  description String  @db.Text
+  type        String  @default("self")
+  duration    Int     @default(5)
+  questions   String  @db.LongText // JSON: [{ id, text, options:[{label,value}] }]
+  scoring     String  @db.Text // JSON: { categories:[{max,label,summary,color}], maxScore }
+  isActive    Boolean @default(true)
+
+  results AssessmentResult[]
+}
+
+model AssessmentResult {
+  id           String   @id @default(cuid())
+  assessmentId String
+  userId       String?
+  guestName    String?
+  guestEmail   String?
+  answers      String   @db.LongText // JSON
+  score        Int
+  category     String
+  summary      String   @db.Text
+  createdAt    DateTime @default(now())
+
+  assessment Assessment @relation(fields: [assessmentId], references: [id])
+  user       User?      @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+}
+
+model MoodEntry {
+  id        String   @id @default(cuid())
+  userId    String
+  date      String // YYYY-MM-DD
+  mood      Int // 1..5
+  note      String?  @db.Text
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, date])
+}
+
+model ContactMessage {
+  id        String   @id @default(cuid())
+  name      String
+  email     String
+  phone     String?
+  service   String?
+  message   String   @db.Text
+  status    String   @default("NEW") // NEW | READ | REPLIED
+  createdAt DateTime @default(now())
+}
+
+model Newsletter {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  createdAt DateTime @default(now())
+}
+
+model Testimonial {
+  id          String  @id @default(cuid())
+  name        String
+  age         Int
+  city        String
+  quote       String  @db.Text
+  rating      Int     @default(5)
+  isPublished Boolean @default(true)
+}
+
+model Faq {
+  id       String @id @default(cuid())
+  question String @db.Text
+  answer   String @db.Text
+  sort     Int    @default(0)
+}
+
+model EmailLog {
+  id        String   @id @default(cuid())
+  to        String
+  subject   String   @db.Text
+  body      String   @db.LongText
+  provider  String   @default("console")
+  status    String   @default("SENT")
+  error     String?  @db.Text
+  createdAt DateTime @default(now())
+}
+
+model ActivityLog {
+  id        String   @id @default(cuid())
+  userId    String?
+  action    String   @db.Text
+  meta      String?  @db.Text
+  createdAt DateTime @default(now())
+
+  user User? @relation(fields: [userId], references: [id])
+}
+
+model Setting {
+  key   String @id
+  value String @db.Text
+}
