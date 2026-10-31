@@ -33,18 +33,6 @@ export function LoginForm({ next }: { next?: string }) {
     }
   }
 
-  function fillDemo(role: "superadmin" | "admin" | "psychologist" | "client") {
-    const accounts = {
-      superadmin: { email: "superadmin@konselingtrenggalek.id", password: "superadmin123" },
-      admin: { email: "admin@konselingtrenggalek.id", password: "admin123" },
-      psychologist: { email: "psikolog@konselingtrenggalek.id", password: "psikolog123" },
-      client: { email: "siti@example.com", password: "client123" },
-    } as const;
-    setEmail(accounts[role].email);
-    setPassword(accounts[role].password);
-    setError("");
-  }
-
   return (
     <form onSubmit={submit} className="space-y-4">
       <div>
@@ -64,9 +52,13 @@ export function LoginForm({ next }: { next?: string }) {
       <div>
         <div className="flex items-center justify-between">
           <label htmlFor="login-password" className="label">Password</label>
-          <span className="mb-1.5 cursor-help text-[10.5px] text-brand" title="Demo: gunakan akun contoh di bawah">
+          <Link
+            href="/kontak"
+            className="mb-1.5 text-[10.5px] text-brand hover:underline"
+            title="Hubungi admin untuk pengaturan ulang password"
+          >
             Lupa password?
-          </span>
+          </Link>
         </div>
         <div className="relative">
           <input
@@ -107,34 +99,6 @@ export function LoginForm({ next }: { next?: string }) {
           </>
         )}
       </button>
-
-      <div className="rounded-2xl border border-dashed border-brand/25 bg-brand-mint/40 p-3.5">
-        <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-brand-dark">
-          Akun demo
-        </p>
-        <div className="mt-2 grid grid-cols-2 gap-2">
-          {(
-            [
-              ["superadmin", "Super Admin"],
-              ["admin", "Admin"],
-              ["psychologist", "Psikolog"],
-              ["client", "Klien"],
-            ] as const
-          ).map(([role, label]) => (
-            <button
-              key={role}
-              type="button"
-              onClick={() => fillDemo(role)}
-              className="rounded-xl bg-white px-2.5 py-2 text-[10.5px] font-medium text-brand-dark shadow-sm transition hover:bg-brand hover:text-white"
-            >
-              {label}
-            </button>
-          ))}
-        </div>
-        <p className="mt-2 text-[9.5px] leading-relaxed text-muted">
-          Klik salah satu untuk mengisi otomatis, lalu tekan Masuk.
-        </p>
-      </div>
 
       <p className="text-center text-[11px] text-muted">
         Belum punya akun?{" "}

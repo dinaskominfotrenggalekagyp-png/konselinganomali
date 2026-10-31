@@ -128,33 +128,6 @@ export default async function AdminPengaturanPage({
     },
   ];
 
-  const accounts = [
-    {
-      role: "Super Admin",
-      email: "superadmin@konselingtrenggalek.id",
-      password: "superadmin123",
-      note: "Akses penuh: akun, artikel, gambar, soal asesmen",
-    },
-    {
-      role: "Admin",
-      email: "admin@konselingtrenggalek.id",
-      password: "admin123",
-      note: "Kelola psikolog dan akun klien",
-    },
-    {
-      role: "Psikolog demo",
-      email: "psikolog@konselingtrenggalek.id",
-      password: "psikolog123",
-      note: "Akun psikolog (dibuat Super Admin)",
-    },
-    {
-      role: "Klien demo",
-      email: "siti@example.com",
-      password: "client123",
-      note: "Portal klien, booking & tagihan",
-    },
-  ];
-
   return (
     <div className="space-y-5">
       <div>
@@ -165,7 +138,7 @@ export default async function AdminPengaturanPage({
           Pengaturan platform
         </h1>
         <p className="mt-1 text-[12px] text-muted">
-          Identitas situs, kontak publik, status integrasi, dan akses demo.
+          Identitas situs, kontak publik, dan status integrasi.
         </p>
       </div>
 
@@ -237,32 +210,7 @@ export default async function AdminPengaturanPage({
         </div>
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-[1fr_1.2fr]">
-        <div className="rounded-3xl border border-line bg-white p-5">
-          <h2 className="font-serif text-lg font-semibold text-brand-deep">
-            Akun demo
-          </h2>
-          <p className="text-[10px] text-muted">
-            Gunakan untuk mencoba alur Super Admin, Admin, Psikolog, dan Klien.
-          </p>
-
-          <div className="mt-3 space-y-2.5">
-            {accounts.map((account) => (
-              <div key={account.email} className="rounded-2xl border border-line p-3">
-                <div className="flex items-center justify-between">
-                  <p className="text-[10px] font-bold uppercase tracking-wide text-brand">
-                    {account.role}
-                  </p>
-                  <ShieldCheck className="h-3.5 w-3.5 text-brand/50" />
-                </div>
-                <p className="mt-1 font-mono text-[10.5px] text-ink">{account.email}</p>
-                <p className="font-mono text-[10.5px] text-muted">{account.password}</p>
-                <p className="mt-1 text-[9px] text-muted">{account.note}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-
+      <div className="grid gap-4">
         <div className="rounded-3xl border border-line bg-white p-5">
           <div className="flex items-center justify-between">
             <div>
