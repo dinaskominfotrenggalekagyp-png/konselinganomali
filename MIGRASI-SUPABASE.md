@@ -200,8 +200,10 @@ Isi juga `SUPABASE_URL` dan `SUPABASE_SERVICE_ROLE_KEY` di Vercel.
 tersedia, dan hanya menulis ke `public/uploads` saat development lokal.
 
 Batas ukuran file 4 MB (di bawah limit body Vercel ±4,5 MB). Foto dari ponsel
-diperkecil otomatis di browser (maks. 1920 px, JPEG 0.85) sebelum diunggah,
-lihat `src/lib/image-client.ts`.
+diperkecil otomatis di browser ke ±100 KB dan baru diunggah saat tombol
+**Simpan** diklik (lihat `src/lib/image-client.ts`). Kalau sebuah gambar
+diganti, file lama otomatis dihapus dari Storage setelah penyimpanan berhasil
+(`src/lib/storage.ts`, dipanggil lewat `after()` di server action).
 
 ---
 
@@ -240,6 +242,8 @@ lihat `src/lib/image-client.ts`.
 | Cache pengaturan situs | `src/lib/settings.ts` | Layout tidak query `Setting` tiap request |
 | Dedupe user per request | `src/lib/auth.ts` (`cache()`) | Layout + page cukup 1 query user |
 | `after()` untuk hitungan views | `edukasi/[slug]/page.tsx` | Write tidak menahan response |
+| Upload gambar ditunda sampai Simpan + kompres ±100 KB | `image-client.ts`, `article-form.tsx`, `branding-settings-form.tsx` | Tidak ada file "yatim" bila form batal; upload cepat |
+| Hapus gambar lama dari Storage | `src/lib/storage.ts` + `admin/actions.ts` | Storage tidak menumpuk file tak terpakai |
 | Index filter/urutan | `prisma/migrations/*_add_query_indexes` | Filter `isActive`, `published`, dll. lebih murah |
 | Health check 1 round trip | `api/health/route.ts` | 5 query → 1 query |
 
