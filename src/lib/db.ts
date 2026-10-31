@@ -1,50 +1,46 @@
 import { PrismaClient } from "@prisma/client";
+import { PrismaPg } from "@prisma/adapter-pg";
 
 /**
+ * Koneksi database untuk runtime (Vercel/serverless).
+ *
  * Supabase menyediakan dua pooler:
  *
- *  - Transaction Pooler  (port 6543) — direkomendasikan untuk serverless,
- *    tapi pada project ini terukur ~6x lebih lambat per query
- *    (≈1.700 ms vs ≈300 ms) sehingga halaman terasa berat.
- *  - Session Pooler      (port 5432) — jauh lebih cepat untuk beban aplikasi
- *    ini dan tetap kompatibel dengan Prisma.
+ *  - Transaction Pooler (port 6543) — banyak instance serverless berbagi
+ *    sedikit koneksi server. Ini yang wajib dipakai di serverless supaya
+ *    tidak kehabisan slot koneksi (session pooler dibatasi ~15 klien).
+ *  - Session Pooler (port 5432) — cepat, tetapi setiap instance menahan satu
+ *    koneksi; dengan auto-scaling Vercel batas 15 klien cepat habis dan
+ *    aplikasi gagal dengan EMAXCONNSESSION.
  *
- * Karena itu URL runtime dinormalisasi ke Session Pooler. Kalau suatu saat
- * butuh Transaction Pooler lagi (mis. trafik tinggi dan koneksi menipis),
- * set env `PRISMA_USE_TRANSACTION_POOLER=1` untuk mematikannya.
+ * Mesin query bawaan Prisma ternyata sangat lambat di port 6543 (±1,4 detik
+ * per query, terukur). Karena itu Prisma dihubungkan lewat driver `pg`
+ * (driver adapter) yang mengukur ±0,35 detik pada koneksi yang sama.
  *
- * Catatan: ini HANYA menyentuh koneksi runtime. `prisma migrate` tetap memakai
- * `directUrl` (DIRECT_URL) dari schema.prisma.
+ * `max: 5` = maksimal 5 koneksi per instance function; sisanya dimultipleks
+ * oleh Transaction Pooler. `prisma migrate` tetap memakai `directUrl`
+ * (DIRECT_URL) dari schema.prisma dan tidak terpengaruh file ini.
  */
-function runtimeDatabaseUrl(): string | undefined {
-  const raw = process.env.DATABASE_URL;
-  if (!raw) return undefined;
-  if (process.env.PRISMA_USE_TRANSACTION_POOLER === "1") return raw;
-
-  try {
-    const url = new URL(raw);
-    if (url.port === "6543") {
-      url.port = "5432";
-      // Parameter khusus PgBouncer transaction mode tidak diperlukan (dan
-      // bisa memperlambat) pada session mode.
-      url.searchParams.delete("pgbouncer");
-      url.searchParams.delete("connection_limit");
-      return url.toString();
-    }
-  } catch {
-    // URL tidak standar — biarkan apa adanya.
-  }
-
-  return raw;
+function databaseUrl(): string | undefined {
+  return process.env.DATABASE_URL;
 }
+
+const log: ("warn" | "error")[] =
+  process.env.NODE_ENV === "development" ? ["warn", "error"] : ["error"];
 
 const globalForPrisma = globalThis as unknown as { prisma?: PrismaClient };
 
-export const db =
-  globalForPrisma.prisma ??
-  new PrismaClient({
-    datasourceUrl: runtimeDatabaseUrl(),
-    log: process.env.NODE_ENV === "development" ? ["warn", "error"] : ["error"],
-  });
+function createClient() {
+  const url = databaseUrl();
+  if (!url) {
+    // Biarkan Prisma melempar error yang jelas saat DATABASE_URL belum diisi.
+    return new PrismaClient({ log });
+  }
+
+  const adapter = new PrismaPg({ connectionString: url, max: 5 });
+  return new PrismaClient({ adapter, log });
+}
+
+export const db = globalForPrisma.prisma ?? createClient();
 
 if (process.env.NODE_ENV !== "production") globalForPrisma.prisma = db;
